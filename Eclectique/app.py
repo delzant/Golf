@@ -1,8 +1,7 @@
 from flask import Flask, render_template, jsonify, request
 import os
-import json
 from eclectique_manager import EclectiqueManager
-
+from datetime import datetime
 app = Flask(__name__)
 db_path = os.environ.get('ECLECTIQUE_DB', 'eclectique.db')
 
@@ -64,23 +63,45 @@ def details_joueur(id_joueur):
     # Meilleurs scores par trou
     meilleurs_scores = []
     for trou in range(1, 19):
+        # Vérifier d'abord s'il existe une correction
         cursor.execute('''
-        SELECT MIN(score), m.date, m.nom_competition
-        FROM scores s 
-        JOIN manches m ON s.id_manche = m.id
-        WHERE s.id_joueur = ? AND s.trou = ?
-        GROUP BY s.trou
+        SELECT score, note, date_correction 
+        FROM corrections 
+        WHERE id_joueur = ? AND trou = ?
         ''', (id_joueur, trou))
         
-        result = cursor.fetchone()
-        if result:
-            score, date, nom_compet = result
+        correction = cursor.fetchone()
+        
+        if correction:
+            # Si une correction existe, l'utiliser
+            score, note, date_correction = correction
             meilleurs_scores.append({
                 "trou": trou,
                 "score": score,
-                "date": date,
-                "competition": nom_compet
+                "date": date_correction,
+                "competition": "Correction manuelle",
+                "note": note,
+                "est_correction": True
             })
+        else:
+            # Sinon, prendre le meilleur score des manches
+            cursor.execute('''
+            SELECT MIN(score), m.date, m.nom_competition
+            FROM scores s 
+            JOIN manches m ON s.id_manche = m.id
+            WHERE s.id_joueur = ? AND s.trou = ?
+            GROUP BY s.trou
+            ''', (id_joueur, trou))
+            
+            result = cursor.fetchone()
+            if result:
+                score, date, nom_compet = result
+                meilleurs_scores.append({
+                    "trou": trou,
+                    "score": score,
+                    "date": date,
+                    "competition": nom_compet
+                })
     
     # Toutes les manches jouées
     cursor.execute('''
@@ -299,6 +320,33 @@ def api_correction(id_joueur):
         },
         "scores": meilleurs_scores
     })
+@app.route('/classement-eclectique/pdf')
+def export_classement_pdf():
+    """Génère et télécharge le PDF du classement éclectique avec date de dernière manche"""
+    manager = EclectiqueManager(db_path)
+    
+    # Récupérer la date de la dernière manche
+    cursor = manager.conn.cursor()
+    cursor.execute("SELECT date FROM manches ORDER BY date DESC LIMIT 1")
+    result = cursor.fetchone()
+    date_str = result[0].replace('-', '') if result else datetime.now().strftime("%Y%m%d")
+    
+    # Générer le PDF dans un dossier temporaire
+    import tempfile
+    import os
+    temp_dir = tempfile.gettempdir()
+    filename = os.path.join(temp_dir, f"classement_eclectique.pdf")
+    
+    success, result = manager.export_pdf(filename=filename)
+    manager.close()
+    
+    if not success:
+        return f"Erreur lors de la génération du PDF: {result}", 500
+    
+    # Renvoyer le fichier PDF avec nom personnalisé
+    from flask import send_file
+    download_name = f"classement_eclectique_{date_str}.pdf"
+    return send_file(filename, as_attachment=True, download_name=download_name)
     
 @app.route('/admin')
 def admin():

@@ -1099,7 +1099,8 @@ class EclectiqueManager:
             # Lignes des joueurs
             pdf.set_font('Arial', '', 9)
             for joueur in joueurs:
-                pdf.cell(col_width_idx, 7, str(joueur['classement']), 1, 0, 'C')
+                # Utiliser 'pos' au lieu de 'classement'
+                pdf.cell(col_width_idx, 7, str(joueur['pos']), 1, 0, 'C')
                 pdf.cell(col_width_nom, 7, joueur['nom'], 1, 0, 'L')
                 pdf.cell(col_width_hcp, 7, f"{joueur['handicap']:.1f}", 1, 0, 'C')
                 pdf.cell(col_width_score, 7, str(joueur[score_key]), 1, 1, 'C')
@@ -1112,15 +1113,20 @@ class EclectiqueManager:
         dessiner_classement("Classement 18 Trous", classement['joueurs_18trous'], 'score_total')
         
         # Nouvelle page pour les catégories
-        if any(len(classement['categories'][cat]) > 0 for cat in classement['categories']):
+        categories_presentes = any(len(classement['categories'][cat]) > 0 for cat in classement['categories'])
+        if categories_presentes:
             pdf.add_page()
             pdf.set_font('Arial', 'B', 14)
             pdf.cell(0, 10, "Classements par catégorie", 0, 1, 'C')
             pdf.ln(5)
             
-            dessiner_classement("Hommes", classement['categories']['homme'], 'score_total')
-            dessiner_classement("Femmes", classement['categories']['femme'], 'score_total')
-            dessiner_classement("Rabit (HCP > 36)", classement['categories']['rabit'], 'score_total')
+            # Utiliser les bonnes clés pour les catégories
+            dessiner_classement("Hommes (9 trous)", classement['categories']['homme_9'], 'score_total')
+            dessiner_classement("Hommes (18 trous)", classement['categories']['homme_18'], 'score_total')
+            dessiner_classement("Femmes (9 trous)", classement['categories']['femme_9'], 'score_total')
+            dessiner_classement("Femmes (18 trous)", classement['categories']['femme_18'], 'score_total')
+            dessiner_classement("Rabit (9 trous)", classement['categories']['rabit_9'], 'score_total')
+            dessiner_classement("Rabit (18 trous)", classement['categories']['rabit_18'], 'score_total')
         
         # Sauvegarder le PDF
         try:
