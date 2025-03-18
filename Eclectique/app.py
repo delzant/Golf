@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 import os
+import json
 from eclectique_manager import EclectiqueManager
 
 app = Flask(__name__)
@@ -196,6 +197,109 @@ def export_manche_pdf(id_manche):
     from flask import send_file
     return send_file(filename, as_attachment=True, download_name=os.path.basename(filename))
 
+@app.route('/api/joueurs')
+def api_joueurs_liste():
+    """API pour obtenir la liste des joueurs en JSON"""
+    manager = EclectiqueManager(db_path)
+    cursor = manager.conn.cursor()
+    cursor.execute("SELECT id_national, nom FROM joueurs ORDER BY nom")
+    joueurs = [{"id": j[0], "nom": j[1]} for j in cursor.fetchall()]
+    manager.close()
+    return jsonify(joueurs)
+
+@app.route('/api/correction/<id_joueur>', methods=['GET', 'POST'])
+def api_correction(id_joueur):
+    """API pour récupérer/enregistrer les corrections d'un joueur"""
+    manager = EclectiqueManager(db_path)
+    
+    if request.method == 'POST':
+        # Traitement de la sauvegarde des corrections
+        corrections = request.json
+        cursor = manager.conn.cursor()
+        
+        for trou, data in corrections.items():
+            trou = int(trou)
+            score = data.get('score')
+            note = data.get('note', '')
+            
+            # Insérer/mettre à jour la correction
+            cursor.execute("""
+                INSERT OR REPLACE INTO corrections 
+                (id_joueur, trou, score, note, date_correction) 
+                VALUES (?, ?, ?, ?, datetime('now'))
+            """, (id_joueur, trou, score, note))
+        
+        manager.conn.commit()
+        manager.close()
+        return jsonify({"success": True})
+    
+    # Méthode GET - Récupérer les meilleures scores et corrections
+    cursor = manager.conn.cursor()
+    
+    # Récupérer les infos du joueur
+    cursor.execute("SELECT nom, handicap FROM joueurs WHERE id_national = ?", (id_joueur,))
+    joueur_info = cursor.fetchone()
+    
+    if not joueur_info:
+        manager.close()
+        return jsonify({"error": f"Joueur {id_joueur} non trouvé"}), 404
+    
+    # Meilleurs scores par trou
+    meilleurs_scores = []
+    for trou in range(1, 19):
+        cursor.execute('''
+        SELECT MIN(score), m.date, m.nom_competition
+        FROM scores s 
+        JOIN manches m ON s.id_manche = m.id
+        WHERE s.id_joueur = ? AND s.trou = ?
+        GROUP BY s.trou
+        ''', (id_joueur, trou))
+        
+        result = cursor.fetchone()
+        score_data = {
+            "trou": trou,
+            "score": None,
+            "date": None,
+            "competition": None,
+            "correction": None,
+            "note_correction": None
+        }
+        
+        if result:
+            score, date, nom_compet = result
+            score_data.update({
+                "score": score,
+                "date": date,
+                "competition": nom_compet
+            })
+        
+        # Vérifier s'il existe une correction
+        cursor.execute('''
+        SELECT score, note, date_correction
+        FROM corrections
+        WHERE id_joueur = ? AND trou = ?
+        ''', (id_joueur, trou))
+        
+        correction = cursor.fetchone()
+        if correction:
+            score_data.update({
+                "correction": correction[0],
+                "note_correction": correction[1],
+                "date_correction": correction[2]
+            })
+            
+        meilleurs_scores.append(score_data)
+    
+    manager.close()
+    return jsonify({
+        "joueur": {
+            "id": id_joueur,
+            "nom": joueur_info[0],
+            "handicap": joueur_info[1]
+        },
+        "scores": meilleurs_scores
+    })
+    
 @app.route('/admin')
 def admin():
     """Interface d'administration"""

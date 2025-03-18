@@ -6,6 +6,7 @@ import glob
 import sys
 import traceback
 from fpdf import FPDF
+import copy
 
 class PDF(FPDF):
     def __init__(self):
@@ -224,6 +225,19 @@ class EclectiqueManager:
             trou INTEGER PRIMARY KEY,
             par INTEGER,
             handicap_index INTEGER
+        )
+        ''')
+        
+        # Table corrections
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS corrections (
+            id_joueur TEXT,
+            trou INTEGER,
+            score INTEGER,
+            note TEXT,
+            date_correction TEXT,
+            PRIMARY KEY (id_joueur, trou),
+            FOREIGN KEY (id_joueur) REFERENCES joueurs(id_national)
         )
         ''')
 
@@ -464,6 +478,19 @@ class EclectiqueManager:
                 ''', (id_joueur, trou))
                 
                 meilleur_score = cursor.fetchone()[0]
+                
+                # Vérifier s'il existe une correction pour ce trou
+                cursor.execute('''
+                SELECT score FROM corrections
+                WHERE id_joueur = ? AND trou = ?
+                ''', (id_joueur, trou))
+                
+                correction = cursor.fetchone()
+                
+                # Utiliser la correction si elle existe
+                if correction is not None:
+                    meilleur_score = correction[0]
+        
                 if meilleur_score is not None:
                     total += meilleur_score
                     scores_par_trou.append((trou, meilleur_score))
@@ -907,34 +934,33 @@ class EclectiqueManager:
             
             # Ajouter le joueur aux classements appropriés
             if nb_trous_aller >= 7 and nb_trous_retour < 3:  # A joué principalement l'aller
-                joueurs_aller.append(joueur_data)
+                joueurs_aller.append(copy.deepcopy(joueur_data))
             elif nb_trous_retour >= 7 and nb_trous_aller < 3:  # A joué principalement le retour
-                joueurs_retour.append(joueur_data)
+                joueurs_retour.append(copy.deepcopy(joueur_data))
             elif nb_trous_aller >= 7 and nb_trous_retour >= 7:  # A joué les 18 trous
-                joueurs_18trous.append(joueur_data)
+                joueurs_18trous.append(copy.deepcopy(joueur_data))
             
             # Ajouter le joueur au classement par catégorie
             if nb_trous_aller >= 7 and nb_trous_retour >= 7:  # A joué les 18 trous
                 if handicap > 36:
-                    categories['rabit_18'].append(joueur_data)
+                    categories['rabit_18'].append(copy.deepcopy(joueur_data))
                 elif genre.lower() == 'men' or genre.lower() == 'homme':
-                    categories['homme_18'].append(joueur_data)
+                    categories['homme_18'].append(copy.deepcopy(joueur_data))
                 else:
-                    categories['femme_18'].append(joueur_data)
+                    categories['femme_18'].append(copy.deepcopy(joueur_data))
             else:  # A joué seulement 9 trous
                 if handicap > 36:
-                    categories['rabit_9'].append(joueur_data)
+                    categories['rabit_9'].append(copy.deepcopy(joueur_data))
                 elif genre.lower() == 'men' or genre.lower() == 'homme':
-                    categories['homme_9'].append(joueur_data)
+                    categories['homme_9'].append(copy.deepcopy(joueur_data))
                 else:
-                    categories['femme_9'].append(joueur_data)
+                    categories['femme_9'].append(copy.deepcopy(joueur_data))
         
         # CLASSEMENT ALLER
         joueurs_aller.sort(key=lambda x: x['score_aller'])
         position_reelle = 1
         classement = 1
         prev_score = None
-
         for i, joueur in enumerate(joueurs_aller):
             if i > 0 and joueur['score_aller'] == prev_score:
                 # Ex-aequo, même position que le précédent

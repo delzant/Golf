@@ -121,6 +121,45 @@
                         </form>
                     </div>
                 </div>
+
+                <div class="card mt-4">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">Corriger un score</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Sélectionner un joueur</label>
+                            <select id="joueurSelect" class="form-select">
+                                <option value="">-- Choisir un joueur --</option>
+                            </select>
+                        </div>
+                        
+                        <div id="correctionForm" style="display: none;">
+                            <h4 id="joueurNom"></h4>
+                            <p class="text-muted">Vous pouvez modifier les meilleurs scores du joueur ci-dessous.</p>
+                            
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Trou</th>
+                                        <th>Meilleur Score</th>
+                                        <th>Date / Compétition</th>
+                                        <th>Correction</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scoresTableBody">
+                                    <!-- Rempli par JavaScript -->
+                                </tbody>
+                            </table>
+                            
+                            <div class="text-center mt-3">
+                                <button id="saveCorrectionsBtn" class="btn btn-primary">Enregistrer les corrections</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -274,6 +313,154 @@
                 })
                 .catch(error => {
                     alert('Erreur de communication avec le serveur: ' + error);
+                });
+            });
+        });
+        // Gestion des corrections
+        document.addEventListener('DOMContentLoaded', function() {
+            const joueurSelect = document.getElementById('joueurSelect');
+            const correctionForm = document.getElementById('correctionForm');
+            const joueurNom = document.getElementById('joueurNom');
+            const scoresTableBody = document.getElementById('scoresTableBody');
+            const saveCorrectionsBtn = document.getElementById('saveCorrectionsBtn');
+            
+            // Charger la liste des joueurs
+            fetch('/api/joueurs')
+                .then(response => response.json())
+                .then(joueurs => {
+                    joueurs.forEach(joueur => {
+                        const option = document.createElement('option');
+                        option.value = joueur.id;
+                        option.textContent = joueur.nom;
+                        joueurSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement des joueurs:', error);
+                });
+            
+            // Gérer le changement de joueur
+            joueurSelect.addEventListener('change', function() {
+                const joueurId = this.value;
+                
+                if (!joueurId) {
+                    correctionForm.style.display = 'none';
+                    return;
+                }
+                
+                fetch(`/api/correction/${joueurId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        joueurNom.textContent = data.joueur.nom + ` (Index: ${data.joueur.handicap})`;
+                        correctionForm.style.display = 'block';
+                        
+                        // Remplir le tableau des scores
+                        scoresTableBody.innerHTML = '';
+                        data.scores.forEach(score => {
+                            const row = document.createElement('tr');
+                            
+                            // Trou
+                            const trouCell = document.createElement('td');
+                            trouCell.textContent = score.trou;
+                            row.appendChild(trouCell);
+                            
+                            // Meilleur score
+                            const scoreCell = document.createElement('td');
+                            scoreCell.textContent = score.score !== null ? score.score : 'Non joué';
+                            row.appendChild(scoreCell);
+                            
+                            // Date/Compétition
+                            const dateCell = document.createElement('td');
+                            if (score.date) {
+                                dateCell.textContent = `${score.date} (${score.competition})`;
+                            } else {
+                                dateCell.textContent = '-';
+                            }
+                            row.appendChild(dateCell);
+                            
+                            // Correction
+                            const correctionCell = document.createElement('td');
+                            const correctionInput = document.createElement('input');
+                            correctionInput.type = 'number';
+                            correctionInput.className = 'form-control correction-input';
+                            correctionInput.dataset.trou = score.trou;
+                            correctionInput.min = 1;
+                            correctionInput.max = 10;
+                            correctionInput.value = score.correction !== null ? score.correction : '';
+                            correctionCell.appendChild(correctionInput);
+                            row.appendChild(correctionCell);
+                            
+                            // Notes
+                            const noteCell = document.createElement('td');
+                            const noteInput = document.createElement('input');
+                            noteInput.type = 'text';
+                            noteInput.className = 'form-control note-input';
+                            noteInput.dataset.trou = score.trou;
+                            noteInput.value = score.note_correction || '';
+                            noteInput.placeholder = 'Raison de la correction';
+                            noteCell.appendChild(noteInput);
+                            row.appendChild(noteCell);
+                            
+                            scoresTableBody.appendChild(row);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors du chargement des scores:', error);
+                    });
+            });
+            
+            // Enregistrer les corrections
+            saveCorrectionsBtn.addEventListener('click', function() {
+                const joueurId = joueurSelect.value;
+                if (!joueurId) return;
+                
+                const corrections = {};
+                
+                // Collecter toutes les corrections
+                document.querySelectorAll('.correction-input').forEach(input => {
+                    const trou = input.dataset.trou;
+                    const score = input.value.trim();
+                    
+                    if (score) {
+                        if (!corrections[trou]) {
+                            corrections[trou] = {};
+                        }
+                        corrections[trou].score = parseInt(score);
+                    }
+                });
+                
+                // Collecter les notes
+                document.querySelectorAll('.note-input').forEach(input => {
+                    const trou = input.dataset.trou;
+                    const note = input.value.trim();
+                    
+                    if (corrections[trou] || note) {
+                        if (!corrections[trou]) {
+                            corrections[trou] = {};
+                        }
+                        corrections[trou].note = note;
+                    }
+                });
+                
+                // Envoyer les corrections au serveur
+                fetch(`/api/correction/${joueurId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(corrections)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Corrections enregistrées avec succès!');
+                    } else {
+                        alert('Erreur lors de l\'enregistrement des corrections.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors de la communication avec le serveur.');
                 });
             });
         });
