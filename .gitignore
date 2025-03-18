@@ -1,0 +1,12 @@
+**/.DS_Store
+**/data/*
+**/*.pdf
+**/*.zip
+**/*.db
+**/*.xlsx
+**/__pycache__/*
+.env
+.venv
+
+# Ignorer les fichiers de configuration spécifiques à l'IDE
+.vscode/
