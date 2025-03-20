@@ -1,27 +1,25 @@
 #!/bin/bash
-# bin/logs.sh
-# Visualisation des logs
+# bin/service.sh
+# Gestion du service Eclectique
 
 case "$1" in
-  app)
-    sudo journalctl -u eclectique -f
+  start)
+    sudo systemctl start eclectique
+    echo "Service eclectique démarré"
     ;;
-  nginx)
-    sudo tail -f /var/log/nginx/error.log /var/log/nginx/access.log
+  stop)
+    sudo systemctl stop eclectique
+    echo "Service eclectique arrêté"
     ;;
-  search)
-    if [ -z "$2" ]; then
-      echo "Spécifiez un terme de recherche"
-      exit 1
-    fi
-    sudo journalctl -u eclectique | grep "$2"
+  restart)
+    sudo systemctl restart eclectique
+    echo "Service eclectique redémarré"
     ;;
-  tail)
-    lines=${2:-50}
-    sudo journalctl -u eclectique -n "$lines"
+  status)
+    sudo systemctl status eclectique
     ;;
   *)
-    echo "Usage: $0 {app|nginx|search <terme>|tail <nombre_lignes>}"
+    echo "Usage: $0 {start|stop|restart|status}"
     exit 1
     ;;
 esac
