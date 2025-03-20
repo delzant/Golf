@@ -360,3 +360,201 @@ pip install -r requirements.txt
 - Création d'une API plus complète pour intégration avec d'autres applications
 - Amélioration de la répartition automatique des joueurs entre aller et retour
 - Gestion de plusieurs parcours différents
+
+# Déploiement et gestion sur AWS
+
+Cette section documente le déploiement et la gestion de l'application Eclectique sur AWS.
+
+## Architecture de déploiement
+
+L'application est déployée selon l'architecture suivante:
+- Instance EC2 (Amazon Linux 2023) pour héberger l'application Flask
+- Nginx comme serveur proxy inverse
+- Gunicorn comme serveur WSGI pour exécuter l'application Flask
+- DNS configuré pour diriger un sous-domaine vers l'instance EC2
+
+## Configuration de l'EC2
+
+### Installation des dépendances
+
+```bash
+sudo dnf update -y
+sudo dnf install -y python3 python3-pip git nginx
+```
+
+### Configuration de l'application
+
+1. Cloner le dépôt:
+```bash
+git clone <URL-du-repo> /home/ec2-user/Golf
+cd /home/ec2-user/Golf
+```
+
+2. Installer les dépendances Python:
+```bash
+pip install -r requirements.txt
+pip install gunicorn
+pip install beautifulsoup4
+```
+
+### Configuration de Gunicorn comme service
+
+Créer un fichier de service systemd:
+```bash
+sudo nano /etc/systemd/system/eclectique.service
+```
+
+Contenu du fichier:
+```ini
+[Unit]
+Description=Gunicorn service for Eclectique
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/Golf/Eclectique
+Environment="PATH=/home/ec2-user/Golf/venv/bin"
+ExecStart=/home/ec2-user/.local/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 app:app
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Activer et démarrer le service:
+```bash
+sudo systemctl enable eclectique
+sudo systemctl start eclectique
+```
+
+### Configuration de Nginx
+
+Créer une configuration Nginx pour l'application:
+```bash
+sudo nano /etc/nginx/conf.d/eclectique.conf
+```
+
+Contenu du fichier pour servir l'application sur un sous-domaine:
+```nginx
+server {
+    listen 80;
+    server_name eclectique.it-xpert.be;
+    
+    location / {
+        proxy_pass http://127.0.0.1:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+    }
+}
+```
+
+Redémarrer Nginx:
+```bash
+sudo systemctl enable nginx
+sudo systemctl restart nginx
+```
+
+## Configuration DNS
+
+Configurer Route 53 ou le fournisseur DNS pour créer un enregistrement A pointant vers l'adresse IP publique de l'instance EC2:
+- Nom: eclectique.it-xpert.be
+- Type: A
+- Valeur: [Adresse IP publique de l'EC2]
+
+## Opérations de maintenance
+
+### Mise à jour du code
+
+Pour mettre à jour l'application avec les dernières modifications:
+```bash
+cd /home/ec2-user/Golf
+git pull
+sudo systemctl restart eclectique
+```
+
+### Surveillance des logs
+
+Logs de l'application (Gunicorn):
+```bash
+sudo journalctl -u eclectique -f
+```
+
+Logs de Nginx:
+```bash
+sudo tail -f /var/log/nginx/error.log
+sudo tail -f /var/log/nginx/access.log
+```
+
+### Gestion de la base de données
+
+Pour transférer une base de données SQLite depuis une machine locale vers EC2:
+```bash
+scp -i /chemin/vers/cle.pem /chemin/local/vers/eclectique.db ec2-user@ip-ec2:/home/ec2-user/Golf/Eclectique/
+```
+
+Pour sauvegarder la base de données depuis EC2:
+```bash
+scp -i /chemin/vers/cle.pem ec2-user@ip-ec2:/home/ec2-user/Golf/Eclectique/eclectique.db /chemin/local/sauvegarde/
+```
+
+## Sécurité
+
+Assurez-vous que le groupe de sécurité de l'instance EC2 autorise uniquement:
+- SSH (port 22) depuis des adresses IP spécifiques
+- HTTP (port 80) depuis partout
+- HTTPS (port 443) depuis partout
+
+Pour une configuration de production complète, il est recommandé d'ajouter HTTPS avec Let's Encrypt:
+```bash
+sudo dnf install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d eclectique.it-xpert.be
+```
+
+## Backup et restauration
+
+### Backup automatique
+
+Créez un script de sauvegarde pour la base de données:
+```bash
+#!/bin/bash
+DATE=$(date +%Y%m%d)
+BACKUP_DIR=/home/ec2-user/backups
+mkdir -p $BACKUP_DIR
+cp /home/ec2-user/Golf/Eclectique/eclectique.db $BACKUP_DIR/eclectique_$DATE.db
+# Optionnel: transfert vers S3
+# aws s3 cp $BACKUP_DIR/eclectique_$DATE.db s3://mon-bucket-de-sauvegarde/
+```
+
+Configurez une tâche cron pour exécuter ce script quotidiennement:
+```bash
+0 2 * * * /home/ec2-user/backup_script.sh
+```
+
+## Résolution des problèmes courants
+
+### L'application ne démarre pas
+```bash
+sudo systemctl status eclectique
+sudo journalctl -u eclectique -n 50
+```
+
+### Nginx affiche une erreur 502 Bad Gateway
+Vérifiez que Gunicorn fonctionne:
+```bash
+ps aux | grep gunicorn
+curl http://127.0.0.1:5000
+```
+
+Installez les dépendances manquantes:
+```bash
+pip install -r requirements.txt
+```
+
+### Problèmes de permission de fichiers
+Assurez-vous que les fichiers sont accessibles par l'utilisateur ec2-user:
+```bash
+sudo chown -R ec2-user:ec2-user /home/ec2-user/Golf
+```
