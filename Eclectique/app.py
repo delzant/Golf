@@ -41,8 +41,16 @@ def index():
         
         score_precedent = joueur['total']
     
+    # Calcul explicite du total_par
+    total_par = sum(pars.get(t, 4) for t in range(1, 19))
+    
     manager.close()
-    return render_template('index.html', joueurs=joueurs_avec_scores, pars=pars)
+    return render_template('index.html', joueurs=joueurs_avec_scores, pars=pars, total_par=total_par)
+
+@app.route('/aide')
+def aide():
+    """Page d'aide pour les utilisateurs"""
+    return render_template('aide.html')
 
 @app.route('/details-joueur/<id_joueur>')
 def details_joueur(id_joueur):
@@ -218,6 +226,25 @@ def export_manche_pdf(id_manche):
     from flask import send_file
     return send_file(filename, as_attachment=True, download_name=os.path.basename(filename))
 
+@app.route('/manche/latest/pdf')
+def export_latest_manche_pdf():
+    """Génère et télécharge le PDF de la dernière manche"""
+    manager = EclectiqueManager(db_path)
+    cursor = manager.conn.cursor()
+    
+    # Récupérer l'ID de la dernière manche
+    cursor.execute("SELECT id FROM manches ORDER BY date DESC LIMIT 1")
+    result = cursor.fetchone()
+    
+    if not result:
+        return "Aucune manche n'existe", 404
+    
+    latest_id = result[0]
+    manager.close()
+    
+    # Rediriger vers l'export PDF de cette manche
+    return export_manche_pdf(latest_id)
+
 @app.route('/api/joueurs')
 def api_joueurs_liste():
     """API pour obtenir la liste des joueurs en JSON"""
@@ -378,7 +405,252 @@ def import_file():
         return jsonify({"success": True, "manche_id": result})
     else:
         return jsonify({"success": False, "error": result})
+    
 
+@app.route('/import-html', methods=['GET', 'POST'])
+def import_html():
+    """Interface pour importer les joueurs à partir d'un fichier HTML"""
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return jsonify({"error": "Aucun fichier fourni"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "Nom de fichier vide"}), 400
+        
+        # Sauvegarder temporairement le fichier
+        temp_path = os.path.join('/tmp', file.filename)
+        file.save(temp_path)
+        
+        manager = EclectiqueManager(db_path)
+        joueurs_aller, joueurs_retour, tous_joueurs = manager.importer_joueurs_html(temp_path)
+        manager.close()
+        
+        # Supprimer le fichier temporaire
+        os.remove(temp_path)
+        
+        return jsonify({
+            "success": True, 
+            "total_joueurs": len(tous_joueurs),
+            "joueurs_aller": len(joueurs_aller),
+            "joueurs_retour": len(joueurs_retour),
+            "data": {
+                "aller": [{"nom": nom, "handicap": hcp} for nom, hcp in joueurs_aller],
+                "retour": [{"nom": nom, "handicap": hcp} for nom, hcp in joueurs_retour]
+            }
+        })
+    
+    return render_template('import_html.html')    
+
+@app.route('/api/import-html', methods=['POST'])
+def api_import_html():
+    """API pour importer les joueurs à partir d'un fichier HTML"""
+    if 'file' not in request.files:
+        return jsonify({"error": "Aucun fichier fourni"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "Nom de fichier vide"}), 400
+    
+    # Sauvegarder temporairement le fichier
+    temp_path = os.path.join('/tmp', file.filename)
+    file.save(temp_path)
+    
+    manager = EclectiqueManager(db_path)
+    joueurs_aller, joueurs_retour, tous_joueurs = manager.importer_joueurs_html(temp_path)
+    manager.close()
+    
+    # Supprimer le fichier temporaire
+    os.remove(temp_path)
+    
+    return jsonify({
+        "success": True, 
+        "total_joueurs": len(tous_joueurs),
+        "joueurs_aller": len(joueurs_aller),
+        "joueurs_retour": len(joueurs_retour),
+        "data": {
+            "aller": [{"nom": nom, "handicap": hcp} for nom, hcp in joueurs_aller],
+            "retour": [{"nom": nom, "handicap": hcp} for nom, hcp in joueurs_retour]
+        }
+    })
+    
+# Routes à ajouter à app.py
+
+@app.route('/flights')
+def flights_management():
+    """Interface de gestion des flights"""
+    return render_template('flights.html')
+
+@app.route('/api/save-flights', methods=['POST'])
+def save_flights():
+    """API pour sauvegarder les flights générés"""
+    try:
+        # Récupération des données
+        data = request.json
+        
+        # Connexion à la base de données
+        manager = EclectiqueManager(db_path)
+        cursor = manager.conn.cursor()
+        
+        # Créer une entrée dans la table des départs
+        cursor.execute("""
+            INSERT INTO flights_departs (date, strategy, random_factor) 
+            VALUES (?, ?, ?)
+        """, (data.get('date'), data.get('strategy'), data.get('randomFactor')))
+        
+        depart_id = cursor.lastrowid
+        
+        # Sauvegarder les flights aller
+        for i, flight in enumerate(data.get('aller', [])):
+            flight_name = f"A{i+1}"
+            
+            # Enregistrer le flight
+            cursor.execute("""
+                INSERT INTO flights (id_depart, nom, type) 
+                VALUES (?, ?, ?)
+            """, (depart_id, flight_name, 'aller'))
+            
+            flight_id = cursor.lastrowid
+            
+            # Enregistrer les joueurs du flight
+            for joueur in flight:
+                cursor.execute("""
+                    INSERT INTO flights_joueurs (id_flight, nom, handicap) 
+                    VALUES (?, ?, ?)
+                """, (flight_id, joueur['nom'], joueur['handicap']))
+        
+        # Sauvegarder les flights retour
+        for i, flight in enumerate(data.get('retour', [])):
+            flight_name = f"R{i+1}"
+            
+            # Enregistrer le flight
+            cursor.execute("""
+                INSERT INTO flights (id_depart, nom, type) 
+                VALUES (?, ?, ?)
+            """, (depart_id, flight_name, 'retour'))
+            
+            flight_id = cursor.lastrowid
+            
+            # Enregistrer les joueurs du flight
+            for joueur in flight:
+                cursor.execute("""
+                    INSERT INTO flights_joueurs (id_flight, nom, handicap) 
+                    VALUES (?, ?, ?)
+                """, (flight_id, joueur['nom'], joueur['handicap']))
+        
+        manager.conn.commit()
+        manager.close()
+        
+        return jsonify({"success": True, "id": depart_id})
+    
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/flights/print/<int:id_depart>')
+def print_flights(id_depart):
+    """Page d'impression des flights"""
+    manager = EclectiqueManager(db_path)
+    cursor = manager.conn.cursor()
+    
+    # Récupérer les informations du départ
+    cursor.execute("SELECT date, strategy FROM flights_departs WHERE id = ?", (id_depart,))
+    depart_info = cursor.fetchone()
+    
+    if not depart_info:
+        manager.close()
+        return "Départ introuvable", 404
+    
+    date, strategy = depart_info
+    
+    # Récupérer les flights aller
+    cursor.execute("""
+        SELECT id, nom FROM flights 
+        WHERE id_depart = ? AND type = 'aller'
+        ORDER BY nom
+    """, (id_depart,))
+    
+    flights_aller = []
+    for flight_id, flight_nom in cursor.fetchall():
+        # Récupérer les joueurs de ce flight
+        cursor.execute("""
+            SELECT nom, handicap FROM flights_joueurs 
+            WHERE id_flight = ?
+            ORDER BY handicap
+        """, (flight_id,))
+        
+        joueurs = [{"nom": nom, "handicap": handicap} for nom, handicap in cursor.fetchall()]
+        
+        flights_aller.append({
+            "id": flight_id,
+            "nom": flight_nom,
+            "joueurs": joueurs
+        })
+    
+    # Récupérer les flights retour
+    cursor.execute("""
+        SELECT id, nom FROM flights 
+        WHERE id_depart = ? AND type = 'retour'
+        ORDER BY nom
+    """, (id_depart,))
+    
+    flights_retour = []
+    for flight_id, flight_nom in cursor.fetchall():
+        # Récupérer les joueurs de ce flight
+        cursor.execute("""
+            SELECT nom, handicap FROM flights_joueurs 
+            WHERE id_flight = ?
+            ORDER BY handicap
+        """, (flight_id,))
+        
+        joueurs = [{"nom": nom, "handicap": handicap} for nom, handicap in cursor.fetchall()]
+        
+        flights_retour.append({
+            "id": flight_id,
+            "nom": flight_nom,
+            "joueurs": joueurs
+        })
+    
+    manager.close()
+    
+    return render_template('flights_print.html', 
+                      id_depart=id_depart,  # Ajouter cette ligne
+                      date=date, 
+                      flights_aller=flights_aller, 
+                      flights_retour=flights_retour)
+
+@app.route('/flights/print/<int:id_depart>/pdf')
+def export_flights_pdf(id_depart):
+    """Génère et télécharge le PDF des flights"""
+    manager = EclectiqueManager(db_path)
+    cursor = manager.conn.cursor()
+    
+    # Récupérer les informations du départ
+    cursor.execute("SELECT date FROM flights_departs WHERE id = ?", (id_depart,))
+    result = cursor.fetchone()
+    
+    if not result:
+        manager.close()
+        return "Départ introuvable", 404
+    
+    date_str = result[0].replace("-", "")
+    
+    # Générer le PDF dans un dossier temporaire
+    import tempfile
+    import os
+    temp_dir = tempfile.gettempdir()
+    filename = os.path.join(temp_dir, f"flights_{date_str}.pdf")
+    
+    # Utiliser une fonction d'export PDF (à implémenter dans le manager)
+    success, result = manager.export_flights_pdf(id_depart, filename)
+    manager.close()
+    
+    if not success:
+        return f"Erreur lors de la génération du PDF: {result}", 500
+    
+    # Renvoyer le fichier PDF
+    from flask import send_file
+    return send_file(filename, as_attachment=True, download_name=f"flights_{date_str}.pdf")    
+    
 if __name__ == '__main__':
     # Créer le dossier templates s'il n'existe pas
     if not os.path.exists('templates'):

@@ -6,9 +6,41 @@
     <title>Classement Eclectique</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .eagle { background-color: #ff0000; color: white; }
-        .birdie { background-color: #ffff00; }
-        .par { background-color: #add8e6; }
+        /* Styles pour les scores */
+        .eagle { 
+            background-color: #ff0000 !important; 
+            color: white !important; 
+        }
+        .birdie { 
+            background-color: #ffff00 !important; 
+            color: black !important;
+        }
+        .par { 
+            background-color: #add8e6 !important; 
+            color: black !important;
+        }
+
+        /* Pour s'assurer que Bootstrap ne surcharge pas les styles */
+        .table td.eagle, 
+        .table td.birdie, 
+        .table td.par {
+            /* Ces règles garantissent que les couleurs sont appliquées */
+            border: 1px solid #dee2e6 !important;
+        }
+        /* Styles pour participations >= 6 en vert */
+        .participations-high { 
+            background-color: #90EE90 !important; /* vert clair */
+        }
+        
+        /* Styles pour les totaux */
+        .total-under-par {
+            background-color: #ff0000 !important;
+            color: white !important;
+        }
+        
+        .total-equal-par {
+            background-color: #add8e6 !important; /* même bleu que pour les pars */
+        }
         .joueur-row { cursor: pointer; }
         .participations-high { background-color: #90EE90; }
         .details { display: none; }
@@ -43,6 +75,9 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/admin">Administration</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/aide">Aide</a>
+                </li>
             </ul>
         </nav>
         
@@ -60,6 +95,7 @@
                         <th>TOT</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     <!-- Ligne PAR -->
                     <tr class="table-light">
@@ -67,11 +103,8 @@
                         <td class="text-start">PAR</td>
                         <td></td>
                         <td></td>
-                        {% set total_par = 0 %}
                         {% for t in range(1, 19) %}
-                            {% set par = pars.get(t, 4) %}
-                            {% set total_par = total_par + par %}
-                            <td class="score-cell">{{ par }}</td>
+                            <td class="score-cell">{{ pars.get(t, 4) }}</td>
                         {% endfor %}
                         <td>{{ total_par }}</td>
                     </tr>
@@ -109,7 +142,14 @@
                                 {% endif %}
                             {% endfor %}
                             
+                            <!-- 3. Modifiez la partie du total dans la boucle des joueurs -->
+                            {% if joueur.total < total_par %}
+                            <td class="total-under-par">{{ joueur.total }}</td>
+                            {% elif joueur.total == total_par %}
+                            <td class="total-equal-par">{{ joueur.total }}</td>
+                            {% else %}
                             <td>{{ joueur.total }}</td>
+                            {% endif %}
                         </tr>
                         
                         <!-- Ligne de détails (cachée par défaut) -->

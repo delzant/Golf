@@ -22,7 +22,7 @@
             display: none;
             margin-top: 20px;
         }
-        #uploadResult {
+        #uploadResult, #uploadHtmlResult {
             margin-top: 20px;
         }
     </style>
@@ -41,6 +41,12 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link active" href="/admin">Administration</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/flights">Gestion des Flights</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/aide">Aide</a>
                 </li>
             </ul>
         </nav>
@@ -65,7 +71,7 @@
                             
                             <div class="progress">
                                 <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                     role="progressbar" style="width: 0%"></div>
+                                    role="progressbar" style="width: 0%"></div>
                             </div>
                             
                             <div class="text-center">
@@ -76,6 +82,10 @@
                         </form>
                         
                         <div id="uploadResult"></div>
+                        
+                        <div class="alert alert-info mt-4">
+                            <p>Pour importer la liste des joueurs depuis un fichier HTML de départ, veuillez utiliser la section <a href="/flights" class="alert-link">Gestion des Flights</a>.</p>
+                        </div>
                     </div>
                 </div>
                 
@@ -91,8 +101,25 @@
                             <a href="/manche/latest/pdf" class="btn btn-outline-primary mx-2">
                                 Exporter dernière manche (PDF)
                             </a>
-                            <a href="/classement.pdf" class="btn btn-outline-success mx-2">
+                            <a href="/classement-eclectique/pdf" class="btn btn-outline-success mx-2">
                                 Exporter classement (PDF)
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Gestion des départs</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Utilisez l'outil de gestion des flights pour créer des départs optimisés.
+                            Vous pourrez importer les joueurs, ajuster manuellement les listes, et générer automatiquement des flights équilibrés.
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <a href="/flights" class="btn btn-primary">
+                                <i class="bi bi-people"></i> Gérer les Flights
                             </a>
                         </div>
                     </div>
@@ -242,6 +269,9 @@
                     return response.json();
                 })
                 .then(data => {
+                    // Masquer la barre de progression après traitement
+                    progress.style.display = 'none';
+
                     if (data.success) {
                         uploadResult.innerHTML = `
                             <div class="alert alert-success">
@@ -271,6 +301,9 @@
                     uploadButton.disabled = true;
                 })
                 .catch(error => {
+                    // Masquer la barre de progression en cas d'erreur aussi
+                    progress.style.display = 'none';
+
                     uploadResult.innerHTML = `
                         <div class="alert alert-danger">
                             <h5>Erreur lors de la communication avec le serveur</h5>
@@ -461,6 +494,184 @@
                 .catch(error => {
                     console.error('Erreur:', error);
                     alert('Erreur lors de la communication avec le serveur.');
+                });
+            });
+        });
+
+        // Gestion de l'import HTML
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropzoneHtml = document.getElementById('dropzoneHtml');
+            const fileInputHtml = document.getElementById('fileInputHtml');
+            const uploadButtonHtml = document.getElementById('uploadButtonHtml');
+            const progressBarHtml = document.querySelector('#progressHtml .progress-bar');
+            const progressHtml = document.getElementById('progressHtml');
+            const uploadHtmlResult = document.getElementById('uploadHtmlResult');
+            const uploadHtmlForm = document.getElementById('uploadHtmlForm');
+            
+            // Gestion du drag & drop pour HTML
+            dropzoneHtml.addEventListener('click', function() {
+                fileInputHtml.click();
+            });
+            
+            dropzoneHtml.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropzoneHtml.classList.add('bg-light');
+            });
+            
+            dropzoneHtml.addEventListener('dragleave', function() {
+                dropzoneHtml.classList.remove('bg-light');
+            });
+            
+            dropzoneHtml.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropzoneHtml.classList.remove('bg-light');
+                
+                if (e.dataTransfer.files.length) {
+                    fileInputHtml.files = e.dataTransfer.files;
+                    updateHtmlFileDisplay();
+                }
+            });
+            
+            fileInputHtml.addEventListener('change', updateHtmlFileDisplay);
+            
+            function updateHtmlFileDisplay() {
+                if (fileInputHtml.files.length > 0) {
+                    const file = fileInputHtml.files[0];
+                    dropzoneHtml.innerHTML = `<p>Fichier sélectionné: <strong>${file.name}</strong> (${formatFileSize(file.size)})</p>`;
+                    uploadButtonHtml.disabled = false;
+                } else {
+                    dropzoneHtml.innerHTML = `<p>Déposez votre fichier HTML ici ou cliquez pour sélectionner</p>`;
+                    uploadButtonHtml.disabled = true;
+                }
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Gestion de l'upload HTML
+            uploadHtmlForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!fileInputHtml.files.length) return;
+                
+                const formData = new FormData();
+                formData.append('file', fileInputHtml.files[0]);
+                
+                // Afficher la barre de progression
+                progressHtml.style.display = 'flex';
+                progressBarHtml.style.width = '0%';
+                uploadHtmlResult.innerHTML = '';
+                uploadButtonHtml.disabled = true;
+                
+                fetch('/api/import-html', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    progressBarHtml.style.width = '100%';
+                    return response.json();
+                })
+                .then(data => {
+                    // Masquer la barre de progression après traitement
+                    progressHtml.style.display = 'none';
+
+                    if (data.success) {
+                        let html = `
+                            <div class="alert alert-success">
+                                <h5>Importation réussie!</h5>
+                                <p>Total des joueurs: ${data.total_joueurs}</p>
+                                <p>Répartition: ${data.joueurs_aller} joueurs à l'aller, ${data.joueurs_retour} joueurs au retour</p>
+                                <div class="mt-3">
+                                    <a href="/flights" class="btn btn-primary">
+                                        Continuer vers la gestion des flights
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Joueurs Aller</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Nom</th>
+                                                    <th>Handicap</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+                        
+                        data.data.aller.forEach((joueur, index) => {
+                            html += `
+                                <tr>
+                                    <td>${index+1}</td>
+                                    <td>${joueur.nom}</td>
+                                    <td>${joueur.handicap}</td>
+                                </tr>`;
+                        });
+                        
+                        html += `</tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Joueurs Retour</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Nom</th>
+                                                    <th>Handicap</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>`;
+                        
+                        data.data.retour.forEach((joueur, index) => {
+                            html += `
+                                <tr>
+                                    <td>${index+1}</td>
+                                    <td>${joueur.nom}</td>
+                                    <td>${joueur.handicap}</td>
+                                </tr>`;
+                        });
+                        
+                        html += `</tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>`;
+                        
+                        uploadHtmlResult.innerHTML = html;
+                    } else {
+                        uploadHtmlResult.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h5>Erreur d'importation</h5>
+                                <p>${data.error}</p>
+                            </div>
+                        `;
+                    }
+                    
+                    // Réinitialiser le formulaire
+                    fileInputHtml.value = '';
+                    dropzoneHtml.innerHTML = `<p>Déposez votre fichier HTML ici ou cliquez pour sélectionner</p>`;
+                    uploadButtonHtml.disabled = true;
+                })
+                .catch(error => {
+                    // Masquer la barre de progression en cas d'erreur aussi
+                    progressHtml.style.display = 'none';
+
+                    uploadHtmlResult.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5>Erreur lors de la communication avec le serveur</h5>
+                            <p>${error.message}</p>
+                        </div>
+                    `;
+                    uploadButtonHtml.disabled = false;
                 });
             });
         });

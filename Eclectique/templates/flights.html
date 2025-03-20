@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Flights</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .player-card {
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .player-card:hover {
+            background-color: #e9ecef;
+        }
+        .player-card.rabbit {
+            border-left: 4px solid #dc3545;
+        }
+        .step-container {
+            display: none;
+        }
+        .step-container.active {
+            display: block;
+        }
+        .flight-card {
+            border: 1px solid #4682B4;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            background-color: #f0f8ff;
+        }
+        .flight-card-header {
+            background-color: #4682B4;
+            color: white;
+            padding: 8px;
+            border-radius: 5px 5px 0 0;
+        }
+        .dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 50px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .dropzone:hover {
+            background-color: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">Gestion des Flights</h1>
+        
+        <nav class="mb-4">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Classement Eclectique</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/manches">Manches</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/admin">Administration</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/flights">Flights</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/aide">Aide</a>
+                </li>
+            </ul>
+        </nav>
+        
+        <!-- Barre de progression du workflow -->
+        <div class="mb-4">
+            <div class="progress" style="height: 30px;">
+                <div class="progress-bar" id="workflow-progress" role="progressbar" style="width: 33%;" aria-valuenow="33" aria-valuemin="0" aria-valuemax="100">Étape 1/3</div>
+            </div>
+        </div>
+        
+        <!-- Étape 1: Import des joueurs -->
+        <div id="step-import" class="step-container active">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">1. Import des joueurs</h4>
+                </div>
+                <div class="card-body">
+                    <form id="importForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <div id="dropzone" class="dropzone">
+                                <p>Déposez votre fichier HTML ici ou cliquez pour sélectionner</p>
+                                <input type="file" id="fileInput" name="file" class="d-none" accept=".html,.htm">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Importer les joueurs</button>
+                    </form>
+                    <div id="importResult" class="mt-3"></div>
+                </div>
+            </div>
+            
+            <div class="text-end">
+                <button id="goToStep2" class="btn btn-success" disabled>Continuer vers l'ajustement des listes</button>
+            </div>
+        </div>
+        
+        <!-- Étape 2: Ajustement des listes -->
+        <div id="step-adjust" class="step-container">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">2. Ajustement des listes de départ</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Cliquez sur un joueur pour le déplacer d'une liste à l'autre.</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">Aller <span id="allerCount" class="badge bg-secondary"></span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="allerList"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0">Retour <span id="retourCount" class="badge bg-secondary"></span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="retourList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <button id="backToStep1" class="btn btn-secondary">Retour à l'import</button>
+                <button id="goToStep3" class="btn btn-success">Continuer vers la création des flights</button>
+            </div>
+        </div>
+        
+        <!-- Étape 3: Création des flights -->
+        <div id="step-flights" class="step-container">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">3. Création des flights</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>Stratégies de création</h5>
+                        <div class="btn-group mb-3">
+                            <button type="button" class="btn btn-outline-primary strategy-btn" data-strategy="simple">Stratégie simple</button>
+                            <button type="button" class="btn btn-outline-primary strategy-btn" data-strategy="kmeans">K-means (par handicap)</button>
+                            <button type="button" class="btn btn-outline-primary strategy-btn" data-strategy="mixed">Mixte (équilibré)</button>
+                        </div>
+                        <div class="mb-3">
+                            <label for="randomFactor" class="form-label">Facteur aléatoire: <span id="randomFactorValue">30%</span></label>
+                            <input type="range" class="form-range" id="randomFactor" min="0" max="100" value="30">
+                        </div>
+                        <button id="generateFlights" class="btn btn-primary">Générer les flights</button>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h5>Flights Aller</h5>
+                            <div id="allerFlights"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Flights Retour</h5>
+                            <div id="retourFlights"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between">
+                <button id="backToStep2" class="btn btn-secondary">Retour à l'ajustement</button>
+                <button id="saveFlights" class="btn btn-success" disabled>Enregistrer les flights</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script>
+        // Remplacer la partie d'importation actuelle dans flights.html par ce code
+        document.addEventListener('DOMContentLoaded', function() {
+            // Variables globales
+            let joueurs = {
+                aller: [],
+                retour: []
+            };
+            let flights = {
+                aller: [],
+                retour: []
+            };
+            let currentStrategy = 'simple';
+            
+            // Gestion des étapes du workflow
+            const steps = ['step-import', 'step-adjust', 'step-flights'];
+            const progressBar = document.getElementById('workflow-progress');
+            
+            function showStep(stepIndex) {
+                steps.forEach((step, index) => {
+                    const element = document.getElementById(step);
+                    if (index === stepIndex) {
+                        element.classList.add('active');
+                    } else {
+                        element.classList.remove('active');
+                    }
+                });
+                
+                // Mettre à jour la barre de progression
+                const progress = ((stepIndex + 1) / steps.length) * 100;
+                progressBar.style.width = progress + '%';
+                progressBar.textContent = `Étape ${stepIndex + 1}/${steps.length}`;
+            }
+            
+            // Navigation entre les étapes
+            document.getElementById('goToStep2').addEventListener('click', () => showStep(1));
+            document.getElementById('backToStep1').addEventListener('click', () => showStep(0));
+            document.getElementById('goToStep3').addEventListener('click', () => showStep(2));
+            document.getElementById('backToStep2').addEventListener('click', () => showStep(1));
+            
+            // Étape 1: Import des joueurs - Avec Drag & Drop
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            const importForm = document.getElementById('importForm');
+            const importResult = document.getElementById('importResult');
+            
+            // Gestion du drag & drop
+            dropzone.addEventListener('click', function() {
+                fileInput.click();
+            });
+            
+            dropzone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('bg-light');
+            });
+            
+            dropzone.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('bg-light');
+            });
+            
+            dropzone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('bg-light');
+                
+                if (e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    updateFileDisplay();
+                }
+            });
+            
+            fileInput.addEventListener('change', updateFileDisplay);
+            
+            function updateFileDisplay() {
+                if (fileInput.files.length > 0) {
+                    const file = fileInput.files[0];
+                    dropzone.innerHTML = `<p>Fichier sélectionné: <strong>${file.name}</strong> (${formatFileSize(file.size)})</p>`;
+                    uploadButton.disabled = false;
+                } else {
+                    dropzone.innerHTML = `<p>Déposez votre fichier HTML ici ou cliquez pour sélectionner</p>`;
+                    uploadButton.disabled = true;
+                }
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else return (bytes / 1048576).toFixed(1) + ' MB';
+            }
+            
+            // Gestion de l'upload
+            importForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!fileInput.files.length) {
+                    importResult.innerHTML = '<div class="alert alert-danger">Aucun fichier sélectionné</div>';
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                // Afficher un message de chargement
+                importResult.innerHTML = '<div class="alert alert-info">Traitement en cours...</div>';
+                
+                fetch('/api/import-html', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        joueurs.aller = data.data.aller;
+                        joueurs.retour = data.data.retour;
+                        
+                        document.getElementById('goToStep2').disabled = false;
+                        
+                        importResult.innerHTML = `
+                            <div class="alert alert-success">
+                                <h5>Importation réussie!</h5>
+                                <p>Total des joueurs: ${data.total_joueurs}</p>
+                                <p>Répartition initiale: ${data.joueurs_aller} joueurs à l'aller, ${data.joueurs_retour} joueurs au retour</p>
+                            </div>
+                        `;
+                        
+                        // Préremplir les listes pour l'étape 2
+                        updatePlayerLists();
+                    } else {
+                        importResult.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h5>Erreur d'importation</h5>
+                                <p>${data.error}</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    importResult.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5>Erreur lors de la communication avec le serveur</h5>
+                            <p>${error.message}</p>
+                        </div>
+                    `;
+                });
+            });
+            
+            // Étape 2: Ajustement des listes
+            function updatePlayerLists() {
+                const allerList = document.getElementById('allerList');
+                const retourList = document.getElementById('retourList');
+                const allerCount = document.getElementById('allerCount');
+                const retourCount = document.getElementById('retourCount');
+                
+                allerList.innerHTML = '';
+                retourList.innerHTML = '';
+                
+                // Mettre à jour les compteurs
+                allerCount.textContent = joueurs.aller.length;
+                retourCount.textContent = joueurs.retour.length;
+                
+                // Afficher la liste des joueurs aller
+                joueurs.aller.forEach(joueur => {
+                    const card = document.createElement('div');
+                    card.className = `player-card ${joueur.handicap > 36 ? 'rabbit' : ''}`;
+                    card.innerHTML = `
+                        <strong>${joueur.nom}</strong> 
+                        <span class="badge ${joueur.handicap > 36 ? 'bg-danger' : 'bg-secondary'} float-end">
+                            ${joueur.handicap}
+                        </span>
+                    `;
+                    card.dataset.nom = joueur.nom;
+                    card.dataset.handicap = joueur.handicap;
+                    card.addEventListener('click', () => movePlayer(joueur, 'aller', 'retour'));
+                    
+                    allerList.appendChild(card);
+                });
+                
+                // Afficher la liste des joueurs retour
+                joueurs.retour.forEach(joueur => {
+                    const card = document.createElement('div');
+                    card.className = `player-card ${joueur.handicap > 36 ? 'rabbit' : ''}`;
+                    card.innerHTML = `
+                        <strong>${joueur.nom}</strong> 
+                        <span class="badge ${joueur.handicap > 36 ? 'bg-danger' : 'bg-secondary'} float-end">
+                            ${joueur.handicap}
+                        </span>
+                    `;
+                    card.dataset.nom = joueur.nom;
+                    card.dataset.handicap = joueur.handicap;
+                    card.addEventListener('click', () => movePlayer(joueur, 'retour', 'aller'));
+                    
+                    retourList.appendChild(card);
+                });
+            }
+            
+            function movePlayer(joueur, sourceList, targetList) {
+                // Rechercher et supprimer le joueur de la liste source
+                const index = joueurs[sourceList].findIndex(j => j.nom === joueur.nom);
+                if (index !== -1) {
+                    joueurs[sourceList].splice(index, 1);
+                    joueurs[targetList].push(joueur);
+                    
+                    // Mettre à jour l'affichage
+                    updatePlayerLists();
+                }
+            }
+            
+            // Étape 3: Création des flights
+            const generateButton = document.getElementById('generateFlights');
+            const saveButton = document.getElementById('saveFlights');
+            const randomFactor = document.getElementById('randomFactor');
+            const randomFactorValue = document.getElementById('randomFactorValue');
+            
+            // Ajouter cet écouteur d'événement après la déclaration de saveButton
+
+            // Gestion du bouton "Enregistrer les flights"
+            saveButton.addEventListener('click', function() {
+                // Vérifier qu'on a bien des flights générés
+                if ((!flights.aller || !flights.aller.length) && (!flights.retour || !flights.retour.length)) {
+                    alert('Aucun flight à enregistrer. Veuillez d\'abord générer des flights.');
+                    return;
+                }
+                
+                // Préparer les données à envoyer au serveur
+                const today = new Date();
+                const dateStr = today.toISOString().split('T')[0]; // format YYYY-MM-DD
+                
+                const flightsData = {
+                    date: dateStr,
+                    strategy: currentStrategy,
+                    randomFactor: parseInt(randomFactor.value),
+                    aller: flights.aller,
+                    retour: flights.retour
+                };
+                
+                // Désactiver le bouton pendant l'enregistrement
+                saveButton.disabled = true;
+                
+                // Afficher un message de chargement
+                const saveMessage = document.createElement('div');
+                saveMessage.className = 'alert alert-info mt-3';
+                saveMessage.textContent = 'Enregistrement des flights en cours...';
+                document.getElementById('step-flights').appendChild(saveMessage);
+                
+                // Envoyer les données au serveur
+                fetch('/api/save-flights', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(flightsData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Rediriger vers la page d'impression des flights
+                        window.location.href = `/flights/print/${data.id}`;
+                    } else {
+                        // Afficher un message d'erreur
+                        saveMessage.className = 'alert alert-danger mt-3';
+                        saveMessage.textContent = `Erreur lors de l'enregistrement: ${data.error}`;
+                        
+                        // Réactiver le bouton
+                        saveButton.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    // Afficher un message d'erreur
+                    saveMessage.className = 'alert alert-danger mt-3';
+                    saveMessage.textContent = `Erreur de communication avec le serveur: ${error.message}`;
+                    
+                    // Réactiver le bouton
+                    saveButton.disabled = false;
+                });
+            });
+            // Mise à jour de l'affichage du facteur aléatoire
+            randomFactor.addEventListener('input', function() {
+                randomFactorValue.textContent = randomFactor.value + '%';
+            });
+            
+            // Sélection de la stratégie
+            document.querySelectorAll('.strategy-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.strategy-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentStrategy = this.dataset.strategy;
+                });
+            });
+            
+            // Génération des flights
+            generateButton.addEventListener('click', function() {
+                const randomValue = parseInt(randomFactor.value) / 100;
+                
+                if (joueurs.aller.length < 2 && joueurs.retour.length < 2) {
+                    alert('Il faut au moins 2 joueurs dans une liste pour créer des flights!');
+                    return;
+                }
+                
+                // Générer les flights selon la stratégie choisie
+                flights = generateFlights(joueurs, currentStrategy, randomValue);
+                
+                // Valider les flights générés
+                const validation = validateFlights(flights);
+                
+                // Afficher les flights
+                displayFlights(flights);
+                
+                // Si des problèmes ont été détectés, afficher un avertissement
+                if (!validation.valid) {
+                    let warningMessage = "Certains problèmes ont été détectés:\n\n";
+                    validation.issues.forEach(issue => {
+                        warningMessage += "- " + issue + "\n";
+                    });
+                    warningMessage += "\nVoulez-vous quand même continuer?";
+                    
+                    if (!confirm(warningMessage)) {
+                        // L'utilisateur a choisi d'annuler
+                        return;
+                    }
+                }
+                
+                // Activer le bouton d'enregistrement
+                saveButton.disabled = false;
+            });            
+
+            function generateFlights(joueurs, strategie, randomFactor) {
+                const result = {
+                    aller: [],
+                    retour: []
+                };
+                
+                // Paramètres de configuration
+                const MAX_JOUEURS_PAR_FLIGHT = 4;
+                const MIN_JOUEURS_PAR_FLIGHT = 2;
+                const MAX_FLIGHTS_PAR_PARCOURS = 9;
+                
+                // Fonction pour mélanger partiellement un tableau
+                function shufflePartially(array, factor) {
+                    const arrayCopy = [...array];
+                    const numToShuffle = Math.floor(array.length * factor);
+                    
+                    if (numToShuffle <= 1) return arrayCopy;
+                    
+                    for (let i = 0; i < numToShuffle; i++) {
+                        const idx1 = Math.floor(Math.random() * array.length);
+                        const idx2 = Math.floor(Math.random() * array.length);
+                        [arrayCopy[idx1], arrayCopy[idx2]] = [arrayCopy[idx2], arrayCopy[idx1]];
+                    }
+                    
+                    return arrayCopy;
+                }
+                
+                // Fonction pour planifier la distribution optimale
+                function planFlightDistribution(totalPlayers, numRabbits) {
+                    // Nombre minimum de flights nécessaires pour les rabbits (1 par flight)
+                    const minFlightsForRabbits = numRabbits;
+                    
+                    // Calculer le nombre total de flights nécessaires
+                    let totalFlights = Math.max(
+                        minFlightsForRabbits,
+                        Math.ceil(totalPlayers / MAX_JOUEURS_PAR_FLIGHT)
+                    );
+                    
+                    // Si le nombre de flights est inférieur à MAX_FLIGHTS_PAR_PARCOURS, équilibrer les joueurs
+                    if (totalFlights <= MAX_FLIGHTS_PAR_PARCOURS) {
+                        // Calculer la taille moyenne des flights (arrondie au supérieur)
+                        const avgPlayersPerFlight = Math.ceil(totalPlayers / totalFlights);
+                        
+                        // Distribution initiale - tous les flights ont la même taille
+                        const distribution = Array(totalFlights).fill(avgPlayersPerFlight);
+                        
+                        // Ajuster pour que le total corresponde au nombre de joueurs
+                        let totalAssigned = avgPlayersPerFlight * totalFlights;
+                        let i = totalFlights - 1;
+                        
+                        while (totalAssigned > totalPlayers) {
+                            distribution[i]--;
+                            totalAssigned--;
+                            i = (i - 1 + totalFlights) % totalFlights;
+                        }
+                        
+                        return distribution;
+                    } else {
+                        // Si plus de joueurs que le maximum, maximiser les flights pleins
+                        const fullFlights = Math.floor(totalPlayers / MAX_JOUEURS_PAR_FLIGHT);
+                        const remainingPlayers = totalPlayers % MAX_JOUEURS_PAR_FLIGHT;
+                        
+                        const distribution = Array(fullFlights).fill(MAX_JOUEURS_PAR_FLIGHT);
+                        
+                        if (remainingPlayers > 0) {
+                            distribution.push(remainingPlayers);
+                        }
+                        
+                        return distribution;
+                    }
+                }
+                
+                // Fonction pour créer les flights selon la stratégie sélectionnée
+                function createFlights(players) {
+                    // Séparer les rabbits des joueurs réguliers
+                    const rabbits = players.filter(p => p.handicap > 36);
+                    const regularPlayers = players.filter(p => p.handicap <= 36);
+                    
+                    // Nombre total de joueurs incluant les rabbits
+                    const totalPlayers = players.length;
+                    
+                    // Planifier la distribution optimale en tenant compte du nombre de rabbits
+                    const distribution = planFlightDistribution(totalPlayers, rabbits.length);
+                    
+                    // Créer les flights vides selon la distribution
+                    const flights = distribution.map(() => []);
+                    
+                    // Placer d'abord les rabbits (un par flight)
+                    rabbits.forEach((rabbit, index) => {
+                        if (index < flights.length) {
+                            flights[index].push(rabbit);
+                        } else {
+                            // Si plus de rabbits que de flights, créer de nouveaux flights
+                            flights.push([rabbit]);
+                        }
+                    });
+                    
+                    // Préparer les joueurs réguliers selon la stratégie
+                    let preparedPlayers = [];
+                    
+                    if (strategie === 'simple') {
+                        // Trier par handicap et appliquer le facteur aléatoire
+                        const sortedPlayers = [...regularPlayers].sort((a, b) => a.handicap - b.handicap);
+                        preparedPlayers = shufflePartially(sortedPlayers, randomFactor);
+                    }
+                    else if (strategie === 'kmeans') {
+                        // Trier par handicap
+                        const sortedPlayers = [...regularPlayers].sort((a, b) => a.handicap - b.handicap);
+                        
+                        // Diviser en groupes de niveau (un nombre égal au nombre de flights planifiés)
+                        const numGroups = Math.min(distribution.length, 3); // Max 3 groupes de niveau
+                        const playerGroups = Array(numGroups).fill().map(() => []);
+                        
+                        // Répartir les joueurs en groupes de niveau
+                        sortedPlayers.forEach((player, idx) => {
+                            const groupIdx = Math.floor(idx * numGroups / sortedPlayers.length);
+                            playerGroups[groupIdx].push(player);
+                        });
+                        
+                        // Mélanger partiellement chaque groupe
+                        for (let i = 0; i < playerGroups.length; i++) {
+                            playerGroups[i] = shufflePartially(playerGroups[i], randomFactor);
+                        }
+                        
+                        // Distribuer les joueurs en alternant les groupes
+                        const mixed = [];
+                        let maxGroupSize = Math.max(...playerGroups.map(g => g.length));
+                        
+                        for (let i = 0; i < maxGroupSize; i++) {
+                            for (let j = 0; j < numGroups; j++) {
+                                if (i < playerGroups[j].length) {
+                                    mixed.push(playerGroups[j][i]);
+                                }
+                            }
+                        }
+                        
+                        preparedPlayers = mixed;
+                    }
+                    else if (strategie === 'mixed') {
+                        // Trier par handicap
+                        const sortedPlayers = [...regularPlayers].sort((a, b) => a.handicap - b.handicap);
+                        
+                        // Diviser en trois niveaux: débutant, intermédiaire, confirmé
+                        const third = Math.ceil(sortedPlayers.length / 3);
+                        const beginners = sortedPlayers.slice(0, third);
+                        const intermediate = sortedPlayers.slice(third, 2 * third);
+                        const advanced = sortedPlayers.slice(2 * third);
+                        
+                        // Mélanger chaque groupe
+                        const shuffledBeginners = shufflePartially(beginners, randomFactor);
+                        const shuffledIntermediate = shufflePartially(intermediate, randomFactor);
+                        const shuffledAdvanced = shufflePartially(advanced, randomFactor);
+                        
+                        // Distribuer les joueurs en alternant les niveaux
+                        const mixed = [];
+                        const maxGroupSize = Math.max(
+                            shuffledBeginners.length, 
+                            shuffledIntermediate.length, 
+                            shuffledAdvanced.length
+                        );
+                        
+                        for (let i = 0; i < maxGroupSize; i++) {
+                            if (i < shuffledBeginners.length) mixed.push(shuffledBeginners[i]);
+                            if (i < shuffledIntermediate.length) mixed.push(shuffledIntermediate[i]);
+                            if (i < shuffledAdvanced.length) mixed.push(shuffledAdvanced[i]);
+                        }
+                        
+                        preparedPlayers = mixed;
+                    }
+                    
+                    // Répartir les joueurs réguliers dans les flights
+                    let playerIndex = 0;
+                    
+                    // Distribuer les joueurs réguliers dans les flights jusqu'à atteindre la taille cible
+                    for (let flightIndex = 0; flightIndex < flights.length; flightIndex++) {
+                        const targetSize = distribution[flightIndex];
+                        while (flights[flightIndex].length < targetSize && playerIndex < preparedPlayers.length) {
+                            flights[flightIndex].push(preparedPlayers[playerIndex++]);
+                        }
+                    }
+                    
+                    // S'il reste des joueurs, les ajouter aux flights qui ont de la place
+                    while (playerIndex < preparedPlayers.length) {
+                        // Trouver le flight avec le moins de joueurs
+                        const minFlightIndex = flights.findIndex(
+                            f => f.length < MAX_JOUEURS_PAR_FLIGHT
+                        );
+                        
+                        if (minFlightIndex !== -1) {
+                            flights[minFlightIndex].push(preparedPlayers[playerIndex++]);
+                        } else {
+                            // Si tous les flights sont pleins, créer un nouveau flight
+                            flights.push([preparedPlayers[playerIndex++]]);
+                        }
+                    }
+                    
+                    return flights;
+                }
+                
+                // Générer les flights pour l'aller et le retour
+                if (joueurs.aller && joueurs.aller.length >= 2) {
+                    result.aller = createFlights(joueurs.aller);
+                }
+                
+                if (joueurs.retour && joueurs.retour.length >= 2) {
+                    result.retour = createFlights(joueurs.retour);
+                }
+                
+                return result;
+            }
+
+            function validateFlights(flights) {
+                const MAX_JOUEURS_PAR_FLIGHT = 4;
+                const MIN_JOUEURS_PAR_FLIGHT = 2;
+                const MAX_RABBITS_PAR_FLIGHT = 1;
+                const MAX_FLIGHTS_PAR_PARCOURS = 9;
+                
+                const issues = [];
+                
+                // Vérifier les flights aller
+                if (flights.aller && flights.aller.length > 0) {
+                    // Vérifier que chaque flight a entre 2 et 4 joueurs
+                    flights.aller.forEach((flight, index) => {
+                        // Vérifier le nombre de joueurs
+                        if (flight.length > MAX_JOUEURS_PAR_FLIGHT) {
+                            issues.push(`Flight A${index+1} a ${flight.length} joueurs (maximum 4 autorisé)`);
+                        }
+                        if (flight.length < MIN_JOUEURS_PAR_FLIGHT) {
+                            issues.push(`Flight A${index+1} a seulement ${flight.length} joueur(s) (minimum 2 requis)`);
+                        }
+                        
+                        // Vérifier le nombre de rabbits
+                        const rabbitsCount = flight.filter(p => p.handicap > 36).length;
+                        if (rabbitsCount > MAX_RABBITS_PAR_FLIGHT) {
+                            issues.push(`Flight A${index+1} a ${rabbitsCount} rabbits (maximum 1 autorisé)`);
+                        }
+                    });
+                    
+                    // Vérifier qu'on n'a pas trop de flights pour Aller
+                    if (flights.aller.length > MAX_FLIGHTS_PAR_PARCOURS) {
+                        issues.push(`Il y a ${flights.aller.length} flights aller (plus que les 9 départs disponibles, deuxième départ nécessaire)`);
+                    }
+                }
+                
+                // Vérifier les flights retour
+                if (flights.retour && flights.retour.length > 0) {
+                    // Vérifier que chaque flight a entre 2 et 4 joueurs
+                    flights.retour.forEach((flight, index) => {
+                        // Vérifier le nombre de joueurs
+                        if (flight.length > MAX_JOUEURS_PAR_FLIGHT) {
+                            issues.push(`Flight R${index+1} a ${flight.length} joueurs (maximum 4 autorisé)`);
+                        }
+                        if (flight.length < MIN_JOUEURS_PAR_FLIGHT) {
+                            issues.push(`Flight R${index+1} a seulement ${flight.length} joueur(s) (minimum 2 requis)`);
+                        }
+                        
+                        // Vérifier le nombre de rabbits
+                        const rabbitsCount = flight.filter(p => p.handicap > 36).length;
+                        if (rabbitsCount > MAX_RABBITS_PAR_FLIGHT) {
+                            issues.push(`Flight R${index+1} a ${rabbitsCount} rabbits (maximum 1 autorisé)`);
+                        }
+                    });
+                    
+                    // Vérifier qu'on n'a pas trop de flights pour Retour
+                    if (flights.retour.length > MAX_FLIGHTS_PAR_PARCOURS) {
+                        issues.push(`Il y a ${flights.retour.length} flights retour (plus que les 9 départs disponibles, deuxième départ nécessaire)`);
+                    }
+                }
+                
+                return {
+                    valid: issues.length === 0,
+                    issues: issues
+                };
+            }
+
+            // Affichage des flights
+            function displayFlights(flights) {
+                const allerFlights = document.getElementById('allerFlights');
+                const retourFlights = document.getElementById('retourFlights');
+                
+                allerFlights.innerHTML = '';
+                retourFlights.innerHTML = '';
+                
+                // Afficher les flights aller
+                if (flights.aller.length === 0) {
+                    allerFlights.innerHTML = '<div class="alert alert-info">Aucun flight créé</div>';
+                } else {
+                    flights.aller.forEach((flight, index) => {
+                        const flightCard = document.createElement('div');
+                        flightCard.className = 'flight-card';
+                        
+                        const hasRabbit = flight.some(p => p.handicap > 36);
+                        
+                        // En-tête du flight
+                        const header = document.createElement('div');
+                        header.className = 'flight-card-header';
+                        header.innerHTML = `<strong>Flight A${index + 1}</strong> - ${flight.length} joueurs ${hasRabbit ? '<span class="badge bg-danger">Rabbit</span>' : ''}`;
+                        flightCard.appendChild(header);
+                        
+                        // Contenu du flight
+                        const body = document.createElement('div');
+                        body.className = 'card-body';
+                        
+                        // Liste des joueurs
+                        const playersList = document.createElement('ul');
+                        playersList.className = 'list-group list-group-flush';
+                        
+                        flight.forEach(player => {
+                            const item = document.createElement('li');
+                            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            item.innerHTML = `
+                                ${player.nom}
+                                <span class="badge ${player.handicap > 36 ? 'bg-danger' : 'bg-secondary'}">${player.handicap}</span>
+                            `;
+                            playersList.appendChild(item);
+                        });
+                        
+                        body.appendChild(playersList);
+                        flightCard.appendChild(body);
+                        
+                        allerFlights.appendChild(flightCard);
+                    });
+                }
+                
+                // Afficher les flights retour
+                if (flights.retour.length === 0) {
+                    retourFlights.innerHTML = '<div class="alert alert-info">Aucun flight créé</div>';
+                } else {
+                    flights.retour.forEach((flight, index) => {
+                        const flightCard = document.createElement('div');
+                        flightCard.className = 'flight-card';
+                        
+                        const hasRabbit = flight.some(p => p.handicap > 36);
+                        
+                        // En-tête du flight
+                        const header = document.createElement('div');
+                        header.className = 'flight-card-header';
+                        header.innerHTML = `<strong>Flight R${index + 1}</strong> - ${flight.length} joueurs ${hasRabbit ? '<span class="badge bg-danger">Rabbit</span>' : ''}`;
+                        flightCard.appendChild(header);
+                        
+                        // Contenu du flight
+                        const body = document.createElement('div');
+                        body.className = 'card-body';
+                        
+                        // Liste des joueurs
+                        const playersList = document.createElement('ul');
+                        playersList.className = 'list-group list-group-flush';
+                        
+                        flight.forEach(player => {
+                            const item = document.createElement('li');
+                            item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                            item.innerHTML = `
+                                ${player.nom}
+                                <span class="badge ${player.handicap > 36 ? 'bg-danger' : 'bg-secondary'}">${player.handicap}</span>
+                            `;
+                            playersList.appendChild(item);
+                        });
+                        
+                        body.appendChild(playersList);
+                        flightCard.appendChild(body);
+                        
+                        retourFlights.appendChild(flightCard);
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+            

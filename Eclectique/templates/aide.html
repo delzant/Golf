@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aide - Eclectique Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .section-card {
+            margin-bottom: 30px;
+            border-left: 4px solid #4682B4;
+        }
+        .section-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .faq-item {
+            border-left: 3px solid #5cb85c;
+            margin-bottom: 20px;
+            padding-left: 15px;
+        }
+        .faq-question {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .feature-icon {
+            font-size: 1.5rem;
+            color: #4682B4;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e7f1ff;
+            color: #0c63e4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4 mb-5">
+        <h1 class="mb-4">Aide - Eclectique Manager</h1>
+        
+        <nav class="mb-4">
+            <ul class="nav nav-tabs">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">Classement Eclectique</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/manches">Manches</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/admin">Administration</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/aide">Aide</a>
+                </li>
+            </ul>
+        </nav>
+
+        <div class="row mt-4">
+            <div class="col-md-3 mb-4">
+                <div class="list-group sticky-top" style="top: 20px;">
+                    <a href="#introduction" class="list-group-item list-group-item-action">Introduction</a>
+                    <a href="#classement" class="list-group-item list-group-item-action">Classement Eclectique</a>
+                    <a href="#manches" class="list-group-item list-group-item-action">Manches</a>
+                    <a href="#flights" class="list-group-item list-group-item-action">Gestion des Flights</a>
+                    <a href="#administration" class="list-group-item list-group-item-action">Administration</a>
+                    <a href="#faq" class="list-group-item list-group-item-action">FAQ</a>
+                </div>
+            </div>
+            
+            <div class="col-md-9">
+                <!-- Introduction -->
+                <div id="introduction" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>Introduction</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>Bienvenue dans l'aide de l'Eclectique Manager, un outil conçu pour gérer les compétitions de golf de type "Eclectique".</p>
+                        
+                        <div class="alert alert-info">
+                            <h5>Qu'est-ce qu'une compétition Eclectique ?</h5>
+                            <p>Une compétition Eclectique se déroule sur plusieurs manches (journées de jeu) et consiste à retenir le meilleur score de chaque joueur sur chaque trou parmi toutes les manches jouées. Le total de ces meilleurs scores constitue le "score eclectique" du joueur.</p>
+                        </div>
+                        
+                        <p>Cet outil permet de :</p>
+                        <ul>
+                            <li>Suivre le classement Eclectique en temps réel</li>
+                            <li>Consulter les détails de chaque manche</li>
+                            <li>Gérer les départs (flights) pour les journées de compétition</li>
+                            <li>Importer les résultats des manches</li>
+                            <li>Exporter les classements en PDF</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Classement Eclectique -->
+                <div id="classement" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>Classement Eclectique</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>La page de classement est la page d'accueil de l'application. Elle présente le classement Eclectique actuel de tous les joueurs.</p>
+                        
+                        <h5 class="mt-3">Comment lire le tableau ?</h5>
+                        <ul>
+                            <li><strong>POS</strong> : La position du joueur dans le classement</li>
+                            <li><strong>Joueur</strong> : Le nom du joueur</li>
+                            <li><strong>Hcp</strong> : Le handicap du joueur</li>
+                            <li><strong>Part.</strong> : Le nombre de manches auxquelles le joueur a participé (en vert si ≥ 6)</li>
+                            <li><strong>1-18</strong> : Les meilleurs scores du joueur pour chaque trou</li>
+                            <li><strong>TOT</strong> : Le score eclectique total</li>
+                        </ul>
+                        
+                        <h5 class="mt-3">Code couleur des scores</h5>
+                        <ul>
+                            <li><span class="badge bg-danger">Rouge</span> : Eagle ou mieux (2 coups sous le par ou mieux)</li>
+                            <li><span class="badge" style="background-color: #ffff00; color: black;">Jaune</span> : Birdie (1 coup sous le par)</li>
+                            <li><span class="badge" style="background-color: #add8e6; color: black;">Bleu</span> : Par</li>
+                            <li>Sans couleur : Au-dessus du par</li>
+                        </ul>
+                        
+                        <h5 class="mt-3">Afficher les détails d'un joueur</h5>
+                        <p>Cliquez sur la ligne d'un joueur pour afficher ses statistiques détaillées :</p>
+                        <ul>
+                            <li>Statistiques générales</li>
+                            <li>Détail des meilleurs scores par trou</li>
+                            <li>Liste des manches jouées avec les scores</li>
+                        </ul>
+                        
+                        <h5 class="mt-3">Exporter le classement</h5>
+                        <p>Utilisez le bouton "Exporter PDF" en haut à droite pour générer un fichier PDF du classement actuel.</p>
+                    </div>
+                </div>
+                
+                <!-- Manches -->
+                <div id="manches" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>Manches</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>La page des manches liste toutes les manches de la compétition. Vous pouvez y consulter les classements détaillés de chaque journée de jeu.</p>
+                        
+                        <h5 class="mt-3">Affichage des manches</h5>
+                        <p>Chaque manche est présentée avec :</p>
+                        <ul>
+                            <li>La date de la manche</li>
+                            <li>Le nom de la compétition</li>
+                            <li>Le nombre de participants</li>
+                            <li>Des boutons d'action pour consulter le détail ou exporter en PDF</li>
+                        </ul>
+                        
+                        <h5 class="mt-3">Détail d'une manche</h5>
+                        <p>En cliquant sur le bouton "Voir" d'une manche, vous accédez à plusieurs onglets :</p>
+                        <ul>
+                            <li><strong>Aller</strong> : Classement des joueurs sur les trous 1-9</li>
+                            <li><strong>Retour</strong> : Classement des joueurs sur les trous 10-18</li>
+                            <li><strong>18 Trous</strong> : Classement global sur les 18 trous</li>
+                            <li><strong>Catégories</strong> : Classements par catégorie (Hommes, Femmes, Rabbits)</li>
+                        </ul>
+                        
+                        <div class="alert alert-secondary mt-3">
+                            <strong>Note :</strong> Les eagles, birdies et pars sont mis en évidence par le même code couleur que sur la page principale.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Gestion des Flights -->
+                <div id="flights" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>Gestion des Flights</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>La page de gestion des flights permet de créer et organiser les départs pour une journée de compétition. Le processus se déroule en trois étapes :</p>
+                        
+                        <div class="accordion mt-3" id="accordionFlights">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingImport">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseImport" aria-expanded="true" aria-controls="collapseImport">
+                                        Étape 1 : Import des joueurs
+                                    </button>
+                                </h2>
+                                <div id="collapseImport" class="accordion-collapse collapse show" aria-labelledby="headingImport" data-bs-parent="#accordionFlights">
+                                    <div class="accordion-body">
+                                        <ol>
+                                            <li>Déposez un fichier HTML contenant la liste des joueurs inscrits</li>
+                                            <li>Cliquez sur "Importer les joueurs" pour charger la liste</li>
+                                            <li>Le système répartit automatiquement les joueurs entre aller (trous 1-9) et retour (trous 10-18)</li>
+                                            <li>Une fois l'import réussi, cliquez sur "Continuer vers l'ajustement des listes"</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingAdjust">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdjust" aria-expanded="false" aria-controls="collapseAdjust">
+                                        Étape 2 : Ajustement des listes
+                                    </button>
+                                </h2>
+                                <div id="collapseAdjust" class="accordion-collapse collapse" aria-labelledby="headingAdjust" data-bs-parent="#accordionFlights">
+                                    <div class="accordion-body">
+                                        <ol>
+                                            <li>Vérifiez la répartition des joueurs entre aller et retour</li>
+                                            <li>Pour déplacer un joueur d'une liste à l'autre, cliquez simplement sur sa carte</li>
+                                            <li>Les joueurs "Rabbits" (handicap > 36) sont identifiés par une bordure rouge</li>
+                                            <li>Une fois les listes ajustées, cliquez sur "Continuer vers la création des flights"</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingCreate">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCreate" aria-expanded="false" aria-controls="collapseCreate">
+                                        Étape 3 : Création des flights
+                                    </button>
+                                </h2>
+                                <div id="collapseCreate" class="accordion-collapse collapse" aria-labelledby="headingCreate" data-bs-parent="#accordionFlights">
+                                    <div class="accordion-body">
+                                        <h6>Stratégies de création</h6>
+                                        <ul>
+                                            <li><strong>Stratégie simple</strong> : Ordre de handicap avec facteur aléatoire</li>
+                                            <li><strong>K-means</strong> : Groupes par niveau de handicap</li>
+                                            <li><strong>Mixte</strong> : Mélange équilibré des niveaux</li>
+                                        </ul>
+                                        
+                                        <h6>Facteur aléatoire</h6>
+                                        <p>Contrôle le niveau d'aléatoire dans la génération des flights (0% = strictement par handicap, 100% = complètement aléatoire)</p>
+                                        
+                                        <ol>
+                                            <li>Sélectionnez une stratégie et ajustez le facteur aléatoire</li>
+                                            <li>Cliquez sur "Générer les flights"</li>
+                                            <li>Vérifiez les flights générés (A1, A2... pour l'aller, R1, R2... pour le retour)</li>
+                                            <li>Si nécessaire, retournez à l'étape 2 pour ajuster les listes</li>
+                                            <li>Une fois satisfait, cliquez sur "Enregistrer les flights"</li>
+                                        </ol>
+                                        
+                                        <div class="alert alert-info mt-3">
+                                            <strong>Note :</strong> Le système validera les flights selon les règles suivantes :
+                                            <ul class="mb-0">
+                                                <li>Entre 2 et 4 joueurs par flight</li>
+                                                <li>Maximum 1 Rabbit (handicap > 36) par flight</li>
+                                                <li>Maximum 9 flights par parcours (aller ou retour)</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingPrint">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePrint" aria-expanded="false" aria-controls="collapsePrint">
+                                        Impression des flights
+                                    </button>
+                                </h2>
+                                <div id="collapsePrint" class="accordion-collapse collapse" aria-labelledby="headingPrint" data-bs-parent="#accordionFlights">
+                                    <div class="accordion-body">
+                                        <p>Après avoir enregistré les flights, vous êtes redirigé vers la page d'impression qui offre trois options :</p>
+                                        <ul>
+                                            <li><strong>Exporter PDF</strong> : Génère un fichier PDF des flights pour l'impression ou le partage</li>
+                                            <li><strong>Imprimer</strong> : Ouvre la boîte de dialogue d'impression de votre navigateur</li>
+                                            <li><strong>Retour</strong> : Revient à la page de gestion des flights</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Administration -->
+                <div id="administration" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>Administration</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>La page d'administration permet de gérer les données de la compétition. Elle propose plusieurs fonctionnalités :</p>
+                        
+                        <h5 class="mt-3">Import des données</h5>
+                        <p>Importez une nouvelle manche depuis un fichier Excel :</p>
+                        <ol>
+                            <li>Déposez le fichier Excel dans la zone prévue ou cliquez pour sélectionner un fichier</li>
+                            <li>Cliquez sur "Importer le fichier"</li>
+                            <li>Une fois l'import réussi, vous pouvez consulter le classement de la manche</li>
+                        </ol>
+                        
+                        <h5 class="mt-3">Export du classement</h5>
+                        <p>Plusieurs options d'export sont disponibles :</p>
+                        <ul>
+                            <li>Voir le classement Eclectique</li>
+                            <li>Exporter la dernière manche en PDF</li>
+                            <li>Exporter le classement Eclectique en PDF</li>
+                        </ul>
+                        
+                        <h5 class="mt-3">Gestion des départs</h5>
+                        <p>Accès rapide à l'outil de gestion des flights pour créer des départs optimisés.</p>
+                        
+                        <h5 class="mt-3">Configuration</h5>
+                        <p>Configurez les pars pour chaque trou du parcours :</p>
+                        <ol>
+                            <li>Ajustez les valeurs pour chaque trou (de 3 à 5)</li>
+                            <li>Cliquez sur "Enregistrer les pars" pour sauvegarder</li>
+                        </ol>
+                        
+                        <h5 class="mt-3">Corriger un score</h5>
+                        <p>Système pour corriger manuellement les scores d'un joueur :</p>
+                        <ol>
+                            <li>Sélectionnez un joueur dans la liste déroulante</li>
+                            <li>Pour chaque trou, vous pouvez entrer une correction et ajouter une note explicative</li>
+                            <li>Cliquez sur "Enregistrer les corrections" pour valider</li>
+                        </ol>
+                        <div class="alert alert-secondary">
+                            <strong>Note :</strong> Les corrections sont prises en compte dans le classement Eclectique et sont traçables avec horodatage.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FAQ -->
+                <div id="faq" class="card section-card">
+                    <div class="card-header section-header">
+                        <h2>FAQ - Foire aux questions</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="faq-item">
+                            <p class="faq-question">Qu'est-ce qu'une compétition Eclectique ?</p>
+                            <p>Une compétition Eclectique est un format de jeu qui se déroule sur plusieurs manches. Le score final de chaque joueur est calculé en retenant son meilleur score sur chaque trou parmi toutes les manches jouées. C'est une façon de permettre aux joueurs d'améliorer progressivement leur parcours "idéal".</p>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Que signifie le code couleur dans les tableaux de scores ?</p>
+                            <p>Les couleurs indiquent la performance par rapport au par du trou :</p>
+                            <ul>
+                                <li><span class="badge bg-danger">Rouge</span> : Eagle ou mieux (2 coups sous le par ou plus)</li>
+                                <li><span class="badge" style="background-color: #ffff00; color: black;">Jaune</span> : Birdie (1 coup sous le par)</li>
+                                <li><span class="badge" style="background-color: #add8e6; color: black;">Bleu</span> : Par</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Qu'est-ce qu'un "Rabbit" ?</p>
+                            <p>Dans cette application, un "Rabbit" désigne un joueur ayant un handicap supérieur à 36. Ces joueurs sont identifiés spécifiquement dans le système car des règles particulières s'appliquent lors de la constitution des flights.</p>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Comment sont constitués les flights ?</p>
+                            <p>Les flights sont constitués selon plusieurs critères :</p>
+                            <ul>
+                                <li>Entre 2 et 4 joueurs par flight</li>
+                                <li>Maximum un Rabbit par flight</li>
+                                <li>Selon la stratégie choisie (simple, k-means ou mixte)</li>
+                                <li>Avec un facteur d'aléatoire ajustable</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Comment sont gérés les ex-aequo dans le classement ?</p>
+                            <p>Lorsque plusieurs joueurs ont le même score total, ils obtiennent la même position dans le classement. Le joueur suivant obtient alors une position décalée du nombre d'ex-aequo.</p>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Que se passe-t-il si un trou n'a pas été joué ?</p>
+                            <p>Les trous non joués sont indiqués par des tirets (--) dans le tableau. Ils ne sont pas comptabilisés dans le score Eclectique jusqu'à ce qu'un score soit enregistré pour ce trou lors d'une manche ultérieure.</p>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Pourquoi certaines participations sont-elles en vert ?</p>
+                            <p>Les participations supérieures ou égales à 6 sont affichées en vert pour mettre en évidence les joueurs ayant participé à un nombre significatif de manches.</p>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Comment importer les résultats d'une nouvelle manche ?</p>
+                            <p>Pour importer une nouvelle manche :</p>
+                            <ol>
+                                <li>Accédez à la page Administration</li>
+                                <li>Dans la section "Importer des données", déposez votre fichier Excel</li>
+                                <li>Cliquez sur "Importer le fichier"</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Comment corriger un score erroné ?</p>
+                            <p>Pour corriger un score :</p>
+                            <ol>
+                                <li>Accédez à la page Administration</li>
+                                <li>Dans la section "Corriger un score", sélectionnez le joueur concerné</li>
+                                <li>Entrez la correction pour le trou concerné</li>
+                                <li>Ajoutez une note explicative pour tracer la raison de la correction</li>
+                                <li>Cliquez sur "Enregistrer les corrections"</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <p class="faq-question">Comment fonctionne la répartition automatique des joueurs entre aller et retour ?</p>
+                            <p>Lors de l'import des joueurs pour la gestion des flights, le système :</p>
+                            <ol>
+                                <li>Cherche l'historique des manches du joueur</li>
+                                <li>Si le joueur a joué l'aller lors de sa dernière manche, il est placé sur le retour (et vice-versa)</li>
+                                <li>Si aucun historique n'est disponible, le joueur est placé dans le groupe avec le moins de joueurs</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Activation du scroll spy pour la navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            const scrollSpy = document.querySelectorAll('.list-group-item');
+            
+            scrollSpy.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetElement = document.getElementById(targetId);
+                    
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 20,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Mettre à jour la classe active
+                    scrollSpy.forEach(i => i.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Activer le premier élément par défaut
+            scrollSpy[0].classList.add('active');
+        });
+    </script>
+</body>
+</html>

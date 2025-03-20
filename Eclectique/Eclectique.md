@@ -6,15 +6,19 @@
 
 Le programme gère:
 - L'importation des résultats depuis des fichiers Excel
+- L'importation des joueurs depuis des fichiers HTML
 - Le stockage des données dans une base SQLite
 - Le calcul du classement Eclectique
+- La gestion des flights (groupes de départ)
 - L'affichage formaté des résultats
-- L'export du classement aux formats PDF et HTML
+- L'export des classements et flights aux formats PDF et HTML
 - Une interface web interactive via Flask
 
 ## Base de données
 
-Le programme utilise SQLite et crée quatre tables principales:
+Le programme utilise SQLite et crée plusieurs tables:
+
+### Tables principales
 
 1. **joueurs**: Stocke les informations des golfeurs
    - `id_national`: Identifiant fédéral du joueur (clé primaire)
@@ -44,11 +48,41 @@ Le programme utilise SQLite et crée quatre tables principales:
    - `par`: Nombre de coups standard pour le trou
    - `handicap_index`: Index de difficulté du trou (non utilisé actuellement)
 
+5. **corrections**: Stocke les corrections manuelles de scores
+   - `id_joueur`: Identifiant du joueur
+   - `trou`: Numéro du trou
+   - `score`: Score corrigé
+   - `note`: Justification de la correction
+   - `date_correction`: Date de la correction
+   - Clé primaire composée: (id_joueur, trou)
+
+### Tables pour les flights
+
+6. **flights_departs**: Informations générales sur un groupe de départs
+   - `id`: Identifiant unique (clé primaire, auto-incrémenté)
+   - `date`: Date des départs
+   - `strategy`: Stratégie utilisée pour la répartition (simple, kmeans, mixed)
+   - `random_factor`: Facteur d'aléatoire (pourcentage)
+
+7. **flights**: Définit les groupes de départs
+   - `id`: Identifiant unique (clé primaire, auto-incrémenté)
+   - `id_depart`: Référence vers flights_departs
+   - `nom`: Nom du flight (ex: A1, R2)
+   - `type`: Type de parcours (aller ou retour)
+
+8. **flights_joueurs**: Joueurs assignés à chaque flight
+   - `id`: Identifiant unique (clé primaire, auto-incrémenté)
+   - `id_flight`: Référence vers flights
+   - `nom`: Nom du joueur
+   - `handicap`: Handicap du joueur
+
 ## Fonctionnalités principales
 
 ### Importation des données
 
-Les données sont importées depuis des fichiers Excel avec une structure spécifique:
+#### Importation de scores
+
+Les scores sont importés depuis des fichiers Excel avec une structure spécifique:
 - La première ligne contient les headers des colonnes: Tee de départ, Genre, Couleur, Date, Nom de la compétition, ID fédéral, Nom, Club, Handicap, Age
 - Puis les scores pour chaque trou joué (colonnes 10 à 27)
 
@@ -58,6 +92,27 @@ Le programme:
 - Évite les doublons en vérifiant si un joueur a déjà des scores pour une date spécifique
 - Gère les erreurs et les fichiers corrompus
 
+#### Importation de joueurs
+
+Le programme peut importer des joueurs depuis un fichier HTML de départ et les répartir automatiquement entre l'aller (trous 1-9) et le retour (trous 10-18). La répartition se fait selon:
+
+- L'historique des manches du joueur (aller pour ceux qui ont joué le retour précédemment et vice-versa)
+- Un équilibrage des groupes si aucun historique n'est disponible
+
+### Gestion des flights
+
+Le programme inclut un système complet de gestion des flights (groupes de départ) avec:
+
+- Importation des joueurs depuis un fichier HTML
+- Répartition des joueurs entre aller et retour
+- Ajustement manuel des listes
+- Génération automatique des flights selon trois stratégies:
+  - Simple: Par ordre de handicap avec facteur aléatoire
+  - K-means: Groupes par niveau avec facteur aléatoire
+  - Mixte: Équilibrage des niveaux dans chaque flight
+- Règles de validation (max 4 joueurs par flight, max 1 "rabbit" par flight, etc.)
+- Export des flights en PDF pour affichage au club
+
 ### Calcul du classement
 
 Le classement Eclectique consiste à:
@@ -66,9 +121,22 @@ Le classement Eclectique consiste à:
 - Trier les joueurs par score total (du plus petit au plus grand)
 - Gérer les ex-aequo (si deux joueurs ont le même score, ils obtiennent le même classement)
 
+Le programme gère également:
+- Les classements par manche (aller, retour, 18 trous)
+- Les classements par catégorie (hommes, femmes, rabbits)
+- Les statistiques d'eagles et de birdies
+
+### Corrections manuelles
+
+Un système de corrections manuelles permet:
+- Corriger les scores d'un joueur sur des trous spécifiques
+- Ajouter une note explicative pour chaque correction
+- Tracer les corrections avec horodatage
+- Prendre en compte ces corrections dans le classement Eclectique
+
 ### Affichage des résultats
 
-L'affichage des résultats est formaté sous forme d'un tableau comprenant:
+L'affichage des résultats est formaté sous forme de tableau comprenant:
 - Les informations des joueurs (Nom, Handicap, Nombre de participations)
 - La ligne des pars pour chaque trou
 - Les meilleurs scores par trou pour chaque joueur (avec code couleur)
@@ -87,12 +155,17 @@ Un affichage détaillé par joueur est également disponible, montrant:
 
 ### Export PDF
 
-Le programme permet d'exporter le classement au format PDF avec:
-- Un tableau complet du classement incluant tous les joueurs
-- Les mêmes codes couleurs que l'affichage console
+Le programme permet d'exporter au format PDF:
+- Le classement Eclectique complet
+- Le classement d'une manche spécifique
+- Les feuilles de départ (flights)
+
+Caractéristiques:
+- Tableaux formatés avec les mêmes codes couleurs que l'affichage console
 - Les participations supérieures à 5 sont mises en évidence avec un fond vert
-- Format optimisé pour tenir sur une page A4 en mode portrait
+- Format optimisé pour tenir sur une page A4
 - Gestion automatique des sauts de page pour les longs classements
+- Mise en évidence des "rabbits" (handicap > 36)
 
 ### Export HTML
 
@@ -107,19 +180,35 @@ Le programme inclut une application web Flask qui permet:
 - Affichage du classement Eclectique avec interface interactive
 - Consultation des détails de chaque joueur via une API JSON
 - Import de nouvelles manches via une interface d'administration
+- Gestion des flights avec interface graphique
+- Gestion des corrections de scores
 - Affichage adapté pour mobile et desktop
 
-### Endpoints API
+### Endpoints API principaux
 
-- `/` : Page d'accueil affichant le classement
+- `/` : Page d'accueil affichant le classement Eclectique
 - `/details-joueur/<id_joueur>` : API JSON retournant les détails d'un joueur
-- `/admin` : Interface d'administration (sans authentification)
+- `/admin` : Interface d'administration
 - `/import` : API pour importer un fichier Excel
+- `/api/import-html` : API pour importer des joueurs depuis un fichier HTML
+- `/api/save-flights` : API pour sauvegarder les flights générés
+- `/flights` : Interface de gestion des flights
+- `/flights/print/<id_depart>` : Affichage des flights pour impression
+- `/flights/print/<id_depart>/pdf` : Export PDF des flights
+- `/api/correction/<id_joueur>` : API pour gérer les corrections de scores
+- `/manches` : Liste des manches disponibles
+- `/manche/<id_manche>` : Affichage du classement d'une manche
+- `/manche/<id_manche>/pdf` : Export PDF d'une manche
 
 ### Structure des templates
 
-- `index.html` : Template pour l'affichage du classement
+- `index.html` : Template pour l'affichage du classement Eclectique
 - `admin.html` : Template pour l'interface d'administration
+- `flights.html` : Template pour la gestion des flights
+- `flights_print.html` : Template pour l'impression des flights
+- `import_html.html` : Template pour l'import de joueurs depuis un fichier HTML
+- `manche.html` : Template pour l'affichage du classement d'une manche
+- `manches.html` : Template pour la liste des manches
 
 ### Lancement du serveur web
 
@@ -149,6 +238,7 @@ Options disponibles:
 - `--reset`: Supprimer et recréer la base de données
 - `--pars VAL`: Configurer les pars des trous (format: 1=4,2=3,3=5,...)
 - `--pdf FICHIER`: Exporter le classement au format PDF
+- `--import-html FICHIER`: Importer les joueurs depuis un fichier HTML
 
 ### Exemples d'utilisation
 
@@ -182,7 +272,12 @@ Options disponibles:
    python eclectique_manager.py --pdf classement.pdf
    ```
 
-7. **Lancer l'interface web**:
+7. **Importer des joueurs depuis un fichier HTML**:
+   ```bash
+   python eclectique_manager.py --import-html departs.html
+   ```
+
+8. **Lancer l'interface web**:
    ```bash
    python app.py
    ```
@@ -204,6 +299,11 @@ Contient la classe `EclectiqueManager` avec toutes les méthodes nécessaires:
 - `afficher_detail_joueur`: Affiche les détails d'un joueur spécifique
 - `export_pdf`: Exporte le classement au format PDF
 - `export_classement_html`: Exporte le classement au format HTML
+- `get_classement_manche`: Calcule le classement d'une manche
+- `get_manches_liste`: Récupère la liste des manches
+- `export_classement_manche_pdf`: Exporte le classement d'une manche en PDF
+- `importer_joueurs_html`: Importe les joueurs depuis un fichier HTML
+- `export_flights_pdf`: Exporte les flights au format PDF
 - `close`: Ferme la connexion à la base de données
 
 Le module intègre également une classe `PDF` qui étend la classe `FPDF` pour personnaliser l'export PDF.
@@ -214,7 +314,14 @@ Contient l'application web Flask:
 - `index()`: Affiche la page d'accueil avec le classement
 - `details_joueur(id_joueur)`: Fournit les détails d'un joueur en JSON
 - `admin()`: Affiche l'interface d'administration
-- `import_file()`: Gère l'importation de fichiers Excel via le web
+- `import_file()`: Gère l'importation de fichiers Excel
+- `import_html()`: Gère l'importation de joueurs depuis un fichier HTML
+- `classement_manche(id_manche)`: Affiche le classement d'une manche
+- `flights_management()`: Affiche l'interface de gestion des flights
+- `save_flights()`: Enregistre les flights générés
+- `print_flights(id_depart)`: Affiche les flights pour impression
+- `export_flights_pdf(id_depart)`: Exporte les flights en PDF
+- `api_correction(id_joueur)`: Gère les corrections de scores
 
 ## Format des fichiers Excel
 
@@ -228,11 +335,13 @@ Le programme attend des fichiers Excel avec la structure suivante:
 
 - Python 3.6 ou supérieur
 - Bibliothèques:
-  - pandas
+  - pandas (pour la lecture des fichiers Excel)
   - sqlite3 (inclus dans Python standard)
   - fpdf2 (pour l'export PDF)
   - Flask (pour l'interface web)
   - Jinja2 (pour le templating)
+  - beautifulsoup4 (pour le parsing HTML)
+  - numpy (pour les calculs)
 
 ## Installation des dépendances
 
@@ -249,3 +358,5 @@ pip install -r requirements.txt
 - Pas de statistiques avancées par joueur ou par trou
 - Ajout d'un contrôle d'accès sur l'interface admin
 - Création d'une API plus complète pour intégration avec d'autres applications
+- Amélioration de la répartition automatique des joueurs entre aller et retour
+- Gestion de plusieurs parcours différents

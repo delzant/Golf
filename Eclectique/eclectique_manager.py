@@ -1,24 +1,28 @@
 import pandas as pd
 import sqlite3
 import os
-from datetime import datetime
+import re
 import glob
 import sys
+import copy
 import traceback
 from fpdf import FPDF
-import copy
+from bs4 import BeautifulSoup
+from datetime import datetime
 
 class PDF(FPDF):
-    def __init__(self):
+    def __init__(self, title="CLASSEMENT ECLECTIQUE"):
         super().__init__(orientation='P', unit='mm', format='A4')
         self.set_auto_page_break(auto=True, margin=10)
         # Définir des marges plus petites
         self.set_margins(5, 10, 5)  # Gauche, Haut, Droite
+        # Stocker le titre personnalisé
+        self.title = title
         
     def header(self):
         # Polices et couleurs
         self.set_font('Arial', 'B', 12)
-        self.cell(0, 10, 'CLASSEMENT ECLECTIQUE', 0, 1, 'C')
+        self.cell(0, 10, self.title, 0, 1, 'C')
         self.ln(5)
     
     def footer(self):
@@ -40,8 +44,11 @@ def export_classement_pdf(manager, filename="classement_eclectique.pdf"):
     pars_data = cursor.fetchall()
     pars = {trou: par for trou, par in pars_data}
     
-    # Créer le PDF
-    pdf = PDF()
+    # Calculer le par total du parcours
+    total_par = sum(pars.values())
+    
+    # Créer le PDF avec le titre approprié
+    pdf = PDF(title="CLASSEMENT ECLECTIQUE")
     pdf.add_page()
     
     # Paramètres (très condensés)
@@ -136,6 +143,7 @@ def export_classement_pdf(manager, filename="classement_eclectique.pdf"):
         scores_dict = dict(r['scores_par_trou'])
         
         for t in range(1, 19):
+            pdf.set_text_color(0, 0, 0)  # Remettre le texte en noir
             if t in scores_dict:
                 score = scores_dict[t]
                 par = pars.get(t, 4)
@@ -143,6 +151,7 @@ def export_classement_pdf(manager, filename="classement_eclectique.pdf"):
                 # Déterminer la couleur de fond
                 if score <= par - 2:  # Eagle ou mieux
                     pdf.set_fill_color(*colors['eagle'])
+                    pdf.set_text_color(255, 255, 255)  # Blanc
                 elif score == par - 1:  # Birdie
                     pdf.set_fill_color(*colors['birdie'])
                 elif score == par:  # Par
@@ -155,8 +164,23 @@ def export_classement_pdf(manager, filename="classement_eclectique.pdf"):
                 # Trou non joué
                 pdf.cell(col_width_trou, col_height, '--', 1, 0, 'C')
         
-        # Total
-        pdf.cell(col_width_tot, col_height, str(r['total']), 1, 1, 'C')
+        # Total avec coloration selon le par du parcours
+        score_total = r['total']
+        
+        if score_total < total_par:
+            # Score inférieur au par (rouge avec texte blanc)
+            pdf.set_fill_color(255, 0, 0)  # Rouge
+            pdf.set_text_color(255, 255, 255)  # Blanc
+            pdf.cell(col_width_tot, col_height, str(score_total), 1, 1, 'C', True)
+            pdf.set_text_color(0, 0, 0)  # Remettre le texte en noir
+        elif score_total == total_par:
+            # Score égal au par (bleu)
+            pdf.set_fill_color(173, 216, 230)  # Bleu clair
+            pdf.cell(col_width_tot, col_height, str(score_total), 1, 1, 'C', True)
+        else:
+            # Score supérieur au par (blanc)
+            pdf.set_fill_color(255, 255, 255)  # Blanc
+            pdf.cell(col_width_tot, col_height, str(score_total), 1, 1, 'C', True)
     
     # Sauvegarder le PDF
     try:
@@ -164,7 +188,7 @@ def export_classement_pdf(manager, filename="classement_eclectique.pdf"):
         return True, filename
     except Exception as e:
         return False, str(e)
-        
+            
 class EclectiqueManager:
     def __init__(self, db_path="eclectique.db", verbose=False):
         self.db_path = db_path
@@ -238,6 +262,36 @@ class EclectiqueManager:
             date_correction TEXT,
             PRIMARY KEY (id_joueur, trou),
             FOREIGN KEY (id_joueur) REFERENCES joueurs(id_national)
+        )
+        ''')
+        
+        # Nouvelles tables pour les flights
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS flights_departs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            strategy TEXT,
+            random_factor INTEGER
+        )
+        ''')
+        
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS flights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_depart INTEGER,
+            nom TEXT,
+            type TEXT,
+            FOREIGN KEY (id_depart) REFERENCES flights_departs(id)
+        )
+        ''')
+        
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS flights_joueurs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_flight INTEGER,
+            nom TEXT,
+            handicap REAL,
+            FOREIGN KEY (id_flight) REFERENCES flights(id)
         )
         ''')
 
@@ -696,7 +750,7 @@ class EclectiqueManager:
             return False, "Module fpdf non installé"
         
         return export_classement_pdf(self, filename)
-    
+
     def export_classement_html(manager, filename="classement.html"):
         """Exporte le classement eclectique au format HTML interactif"""
         cursor = manager.conn.cursor()
@@ -707,6 +761,9 @@ class EclectiqueManager:
         cursor.execute("SELECT trou, par FROM trous")
         pars_data = cursor.fetchall()
         pars = {trou: par for trou, par in pars_data}
+        
+        # Calculer le par total du parcours
+        total_par = sum(pars.values())
         
         html = """
         <!DOCTYPE html>
@@ -723,6 +780,9 @@ class EclectiqueManager:
                 .eagle { background-color: #ff0000; color: white; }
                 .birdie { background-color: #ffff00; }
                 .par { background-color: #add8e6; }
+                .under-par { background-color: #ff0000; color: white; }
+                .equal-par { background-color: #add8e6; }
+                .over-par { background-color: #ffffff; }
                 .joueur-row { cursor: pointer; }
                 .details { display: none; }
                 .details-visible { display: table-row; }
@@ -834,8 +894,20 @@ class EclectiqueManager:
                     # Trou non joué
                     html += "<td>--</td>"
             
-            # Total
-            html += f"<td>{r['total']}</td></tr>"
+            # Total avec coloration selon le par du parcours
+            score_total = r['total']
+            
+            if score_total < total_par:
+                # Score inférieur au par (rouge avec texte blanc)
+                html += f"<td class='under-par'>{score_total}</td>"
+            elif score_total == total_par:
+                # Score égal au par (bleu)
+                html += f"<td class='equal-par'>{score_total}</td>"
+            else:
+                # Score supérieur au par (blanc)
+                html += f"<td class='over-par'>{score_total}</td>"
+                
+            html += "</tr>"
             
             # Ligne de détails (initialement cachée)
             html += f"""
@@ -857,7 +929,7 @@ class EclectiqueManager:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(html)
         
-        return True, filename
+        return True, filename    
 
     def get_classement_manche(self, id_manche):
         """Calcule le classement brut pour une manche spécifique"""
@@ -911,6 +983,29 @@ class EclectiqueManager:
             trous_aller = [t for t in range(1, 10) if t in scores_dict and scores_dict[t] < 11]
             trous_retour = [t for t in range(10, 19) if t in scores_dict and scores_dict[t] < 11]
             
+            # Initialisation des listes pour eagles et birdies
+            eagles = []
+            birdies = []
+            nb_eagles = 0
+            nb_birdies = 0
+            
+            # Récupérer d'abord tous les pars des trous
+            cursor.execute("SELECT trou, par FROM trous")
+            pars_dict = {trou: par for trou, par in cursor.fetchall()}
+
+            # Pour chaque trou joué, vérifier si eagle ou birdie
+            for trou, score in scores:
+                # Récupérer le par du trou
+                par_trou = pars_dict.get(trou, 4)  # Utilise 4 comme valeur par défaut
+                
+                # Calculer les eagles et birdies
+                if score <= par_trou - 2:  # Eagle ou mieux
+                    eagles.append(trou)
+                    nb_eagles += 1
+                elif score == par_trou - 1:  # Birdie
+                    birdies.append(trou)
+                    nb_birdies += 1
+            
             # Calculer les scores totaux
             score_aller = sum(scores_dict.get(t, 0) for t in trous_aller)
             score_retour = sum(scores_dict.get(t, 0) for t in trous_retour)
@@ -929,7 +1024,11 @@ class EclectiqueManager:
                 'nb_trous_retour': nb_trous_retour,
                 'score_aller': score_aller,
                 'score_retour': score_retour,
-                'score_total': score_aller + score_retour
+                'score_total': score_aller + score_retour,
+                'eagles': eagles,
+                'birdies': birdies,
+                'nb_eagles': nb_eagles,
+                'nb_birdies': nb_birdies
             }
             
             # Ajouter le joueur aux classements appropriés
@@ -1023,13 +1122,50 @@ class EclectiqueManager:
                 prev_score = joueur['score_total']
                 position_reelle += 1
         
+        # Fonction pour calculer les stats globales
+        def calculer_stats_globales(joueurs):
+            if not joueurs:
+                return {'total_eagles': 0, 'total_birdies': 0, 'joueurs_stats': []}
+            
+            total_eagles = sum(j['nb_eagles'] for j in joueurs)
+            total_birdies = sum(j['nb_birdies'] for j in joueurs)
+            
+            # Liste des joueurs avec au moins 1 eagle ou 1 birdie
+            joueurs_stats = []
+            for j in joueurs:
+                if j['nb_eagles'] > 0 or j['nb_birdies'] > 0:
+                    joueurs_stats.append({
+                        'nom': j['nom'],
+                        'eagles': j['nb_eagles'],
+                        'birdies': j['nb_birdies'],
+                        'trous_eagles': j['eagles'],
+                        'trous_birdies': j['birdies']
+                    })
+            
+            # Trier par nombre d'eagles puis de birdies
+            joueurs_stats.sort(key=lambda x: (x['eagles'], x['birdies']), reverse=True)
+            
+            return {
+                'total_eagles': total_eagles,
+                'total_birdies': total_birdies,
+                'joueurs_stats': joueurs_stats
+            }
+
+        # Calculer les statistiques pour chaque groupe
+        stats_aller = calculer_stats_globales(joueurs_aller)
+        stats_retour = calculer_stats_globales(joueurs_retour)
+        stats_18trous = calculer_stats_globales(joueurs_18trous)
+
         # Assembler tous les résultats
         resultats = {
             'info': {'id': id_manche, 'date': date_manche, 'nom': nom_competition},
             'joueurs_aller': joueurs_aller,
             'joueurs_retour': joueurs_retour,
             'joueurs_18trous': joueurs_18trous,
-            'categories': categories
+            'categories': categories,
+            'stats_aller': stats_aller,
+            'stats_retour': stats_retour,
+            'stats_18trous': stats_18trous
         }
         
         return resultats
@@ -1062,6 +1198,24 @@ class EclectiqueManager:
         cursor.execute("SELECT trou, par FROM trous")
         pars_data = cursor.fetchall()
         pars = {trou: par for trou, par in pars_data}
+        
+        # Calculer les statistiques d'eagles et birdies
+        eagles = []
+        birdies = []
+
+        for joueur_list in [classement['joueurs_aller'], classement['joueurs_retour'], classement['joueurs_18trous']]:
+            for joueur in joueur_list:
+                for trou, score in joueur['scores'].items():
+                    if score < 11:  # Score valide 
+                        par = pars.get(int(trou), 4)
+                        if score <= par - 2:  # Eagle ou mieux
+                            eagles.append({'nom': joueur['nom'], 'trou': trou, 'score': score, 'par': par})
+                        elif score == par - 1:  # Birdie
+                            birdies.append({'nom': joueur['nom'], 'trou': trou, 'score': score, 'par': par})
+
+        
+        print(f"Eagles: {eagles}")
+        print(f"Birdies: {birdies}")
         
         # Créer le PDF
         pdf = PDF()
@@ -1128,6 +1282,51 @@ class EclectiqueManager:
             dessiner_classement("Rabit (9 trous)", classement['categories']['rabit_9'], 'score_total')
             dessiner_classement("Rabit (18 trous)", classement['categories']['rabit_18'], 'score_total')
         
+        # Ajouter une page pour les statistiques si nécessaire
+        if eagles or birdies:
+            pdf.add_page()
+            pdf.set_font('Arial', 'B', 14)
+            pdf.cell(0, 10, "Statistiques de la manche", 0, 1, 'C')
+            pdf.ln(5)
+            
+            # Eagles
+            if eagles:
+                pdf.set_font('Arial', 'B', 12)
+                pdf.cell(0, 10, "Eagles et mieux", 0, 1, 'L')
+                pdf.set_font('Arial', '', 10)
+                
+                pdf.set_fill_color(255, 0, 0)  # Rouge pour eagles
+                pdf.cell(60, 7, "Joueur", 1, 0, 'L', True)
+                pdf.cell(20, 7, "Trou", 1, 0, 'C', True)
+                pdf.cell(20, 7, "Score", 1, 0, 'C', True)
+                pdf.cell(20, 7, "Par", 1, 1, 'C', True)
+                
+                for eagle in eagles:
+                    pdf.cell(60, 7, eagle['nom'], 1, 0, 'L')
+                    pdf.cell(20, 7, str(eagle['trou']), 1, 0, 'C')
+                    pdf.cell(20, 7, str(eagle['score']), 1, 0, 'C')
+                    pdf.cell(20, 7, str(eagle['par']), 1, 1, 'C')
+                
+                pdf.ln(5)
+    
+            # Birdies
+            if birdies:
+                pdf.set_font('Arial', 'B', 12)
+                pdf.cell(0, 10, "Birdies", 0, 1, 'L')
+                pdf.set_font('Arial', '', 10)
+                
+                pdf.set_fill_color(255, 255, 0)  # Jaune pour birdies
+                pdf.cell(60, 7, "Joueur", 1, 0, 'L', True)
+                pdf.cell(20, 7, "Trou", 1, 0, 'C', True)
+                pdf.cell(20, 7, "Score", 1, 0, 'C', True)
+                pdf.cell(20, 7, "Par", 1, 1, 'C', True)
+                
+                for birdie in birdies:
+                    pdf.cell(60, 7, birdie['nom'], 1, 0, 'L')
+                    pdf.cell(20, 7, str(birdie['trou']), 1, 0, 'C')
+                    pdf.cell(20, 7, str(birdie['score']), 1, 0, 'C')
+                    pdf.cell(20, 7, str(birdie['par']), 1, 1, 'C')
+                        
         # Sauvegarder le PDF
         try:
             pdf.output(filename)
@@ -1135,6 +1334,277 @@ class EclectiqueManager:
         except Exception as e:
             return False, str(e)
     
+    def importer_joueurs_html(self, fichier_html):
+        """
+        Importe les joueurs inscrits à partir d'un fichier HTML de départ.
+        Répartit les joueurs entre aller et retour selon leur dernière participation.
+        
+        Args:
+            fichier_html (str): Chemin vers le fichier HTML
+            
+        Returns:
+            tuple: (joueurs_aller, joueurs_retour, tous_joueurs)
+        """
+        self.log(f"Début de l'importation des joueurs depuis {fichier_html}")
+        
+        # Lecture du fichier HTML
+        try:
+            with open(fichier_html, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+        except UnicodeDecodeError:
+            self.log(f"Erreur d'encodage UTF-8, essai avec latin-1")
+            with open(fichier_html, 'r', encoding='latin-1') as f:
+                html_content = f.read()
+                
+        from bs4 import BeautifulSoup
+        import re
+        
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Liste pour stocker les joueurs
+        tous_joueurs = []
+        
+        # Chercher les liens qui contiennent les noms des joueurs
+        links = soup.find_all('a', class_='buttonProfile')
+        
+        self.log(f"Trouvé {len(links)} joueurs dans le HTML")
+        
+        for link in links:
+            texte = link.text.strip()
+            
+            # Extraction du nom et du handicap avec regex
+            match = re.search(r'([^(]+)\s*\(([0-9,.]+)\)', texte)
+            if match:
+                nom = match.group(1).strip()
+                handicap = float(match.group(2).strip().replace(',', '.'))
+                tous_joueurs.append((nom, handicap))
+        
+        self.log(f"Extraction de {len(tous_joueurs)} joueurs du HTML")
+        
+        # Initialisation des listes pour aller et retour
+        joueurs_aller = []
+        joueurs_retour = []
+        
+        cursor = self.conn.cursor()
+        
+        # Pour chaque joueur, déterminer s'il va jouer l'aller ou le retour
+        for nom, handicap in tous_joueurs:
+            self.log(f"Traitement de {nom} (handicap: {handicap})")
+            
+            # Rechercher le joueur dans la base de données
+            cursor.execute("""
+                SELECT id_national, nom FROM joueurs 
+                WHERE nom LIKE ? OR ? LIKE CONCAT('%', nom, '%')
+            """, (f"%{nom}%", nom))
+            
+            joueur_rows = cursor.fetchall()
+            
+            if not joueur_rows:
+                self.log(f"Joueur non trouvé dans la BD: {nom} -> équilibrage (choix aller/retour)")
+                # Placer le joueur dans le groupe avec moins de joueurs
+                if len(joueurs_aller) <= len(joueurs_retour):
+                    joueurs_aller.append((nom, handicap))
+                else:
+                    joueurs_retour.append((nom, handicap))
+                continue
+            
+            # Si plusieurs correspondances, prendre la première
+            if len(joueur_rows) > 1:
+                self.log(f"Plusieurs correspondances trouvées pour {nom}: {joueur_rows}")
+            
+            id_joueur = joueur_rows[0][0]
+            nom_bd = joueur_rows[0][1]
+            self.log(f"Match trouvé: {nom} -> {id_joueur} ({nom_bd})")
+            
+            # Récupérer les manches jouées par ce joueur, triées par date décroissante
+            cursor.execute("""
+                SELECT DISTINCT m.id, m.date
+                FROM scores s
+                JOIN manches m ON s.id_manche = m.id
+                WHERE s.id_joueur = ?
+                ORDER BY m.date DESC
+            """, (id_joueur,))
+            
+            manches_jouees = cursor.fetchall()
+            
+            if not manches_jouees:
+                self.log(f"Aucune manche jouée par {nom} -> équilibrage")
+                # Équilibrage basique
+                if len(joueurs_aller) <= len(joueurs_retour):
+                    joueurs_aller.append((nom, handicap))
+                else:
+                    joueurs_retour.append((nom, handicap))
+                continue
+            
+            # Analyser chaque manche jusqu'à trouver une manche avec seulement 9 trous
+            parcours_trouve = False
+            
+            for id_manche, date_manche in manches_jouees:
+                self.log(f"Analyse de la manche {id_manche} du {date_manche} pour {nom}")
+                
+                # Récupérer les trous joués dans cette manche
+                cursor.execute("""
+                    SELECT trou FROM scores
+                    WHERE id_joueur = ? AND id_manche = ?
+                    ORDER BY trou
+                """, (id_joueur, id_manche))
+                
+                trous_joues = [row[0] for row in cursor.fetchall()]
+                self.log(f"Trous joués dans cette manche: {trous_joues}")
+                
+                # Vérifier s'il s'agit d'un 9 trous
+                if len(trous_joues) <= 9:
+                    trous_aller = sum(1 for t in trous_joues if 1 <= t <= 9)
+                    trous_retour = sum(1 for t in trous_joues if 10 <= t <= 18)
+                    
+                    if trous_aller > trous_retour:
+                        self.log(f"{nom} a joué l'aller lors de sa dernière manche -> retour")
+                        joueurs_retour.append((nom, handicap))
+                        parcours_trouve = True
+                        break
+                    elif trous_retour > trous_aller:
+                        self.log(f"{nom} a joué le retour lors de sa dernière manche -> aller")
+                        joueurs_aller.append((nom, handicap))
+                        parcours_trouve = True
+                        break
+            
+            # Si aucune manche avec 9 trous n'a été trouvée, équilibrer les groupes
+            if not parcours_trouve:
+                self.log(f"Aucune manche 9 trous trouvée pour {nom} -> équilibrage")
+                if len(joueurs_aller) <= len(joueurs_retour):
+                    joueurs_aller.append((nom, handicap))
+                else:
+                    joueurs_retour.append((nom, handicap))
+        
+        self.log(f"Répartition finale: {len(joueurs_aller)} à l'aller, {len(joueurs_retour)} au retour")
+        
+        return joueurs_aller, joueurs_retour, tous_joueurs
+    
+    def export_flights_pdf(self, id_depart, filename):
+        """Exporte les flights au format PDF"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # Récupérer les informations du départ
+            cursor.execute("SELECT date FROM flights_departs WHERE id = ?", (id_depart,))
+            result = cursor.fetchone()
+            
+            if not result:
+                return False, "Départ introuvable"
+            
+            date_str = result[0]
+            
+            # Créer le PDF avec un titre personnalisé
+            pdf = PDF(title="FEUILLE DE DÉPARTS")
+            pdf.add_page()
+            
+            # Ajouter la date
+            pdf.set_font('Arial', 'I', 12)
+            pdf.cell(0, 8, f"Date: {date_str}", 0, 1, 'C')
+            pdf.ln(5)
+            
+            # Récupérer les flights aller
+            cursor.execute("""
+                SELECT id, nom FROM flights 
+                WHERE id_depart = ? AND type = 'aller'
+                ORDER BY nom
+            """, (id_depart,))
+            
+            flights_aller = cursor.fetchall()
+            
+            if flights_aller:
+                pdf.set_font('Arial', 'B', 14)
+                pdf.cell(0, 10, "DÉPARTS ALLER (Trous 1-9)", 0, 1, 'L')
+                
+                for flight_id, flight_nom in flights_aller:
+                    # Titre du flight
+                    pdf.set_font('Arial', 'B', 12)
+                    pdf.set_fill_color(200, 220, 255)
+                    pdf.cell(0, 8, f"Flight {flight_nom}", 1, 1, 'C', True)
+                    
+                    # En-tête tableau joueurs
+                    pdf.set_font('Arial', 'B', 10)
+                    pdf.set_fill_color(220, 220, 220)
+                    pdf.cell(100, 7, "Joueur", 1, 0, 'L', True)
+                    pdf.cell(30, 7, "Handicap", 1, 1, 'C', True)
+                    
+                    # Récupérer et afficher les joueurs
+                    cursor.execute("""
+                        SELECT nom, handicap FROM flights_joueurs 
+                        WHERE id_flight = ?
+                        ORDER BY handicap
+                    """, (flight_id,))
+                    
+                    pdf.set_font('Arial', '', 10)
+                    for nom, handicap in cursor.fetchall():
+                        # Mettre en évidence les rabbits
+                        if handicap > 36:
+                            pdf.set_fill_color(255, 200, 200)
+                            pdf.cell(100, 7, nom, 1, 0, 'L', True)
+                            pdf.cell(30, 7, f"{handicap:.1f}", 1, 1, 'C', True)
+                        else:
+                            pdf.cell(100, 7, nom, 1, 0, 'L')
+                            pdf.cell(30, 7, f"{handicap:.1f}", 1, 1, 'C')
+                    
+                    pdf.ln(5)
+            
+            # Récupérer les flights retour
+            cursor.execute("""
+                SELECT id, nom FROM flights 
+                WHERE id_depart = ? AND type = 'retour'
+                ORDER BY nom
+            """, (id_depart,))
+            
+            flights_retour = cursor.fetchall()
+            
+            if flights_retour:
+                # Ajouter une nouvelle page si nécessaire
+                if pdf.get_y() > 180:
+                    pdf.add_page()
+                
+                pdf.set_font('Arial', 'B', 14)
+                pdf.cell(0, 10, "DÉPARTS RETOUR (Trous 10-18)", 0, 1, 'L')
+                
+                for flight_id, flight_nom in flights_retour:
+                    # Titre du flight
+                    pdf.set_font('Arial', 'B', 12)
+                    pdf.set_fill_color(200, 255, 200)  # Couleur différente pour les retours
+                    pdf.cell(0, 8, f"Flight {flight_nom}", 1, 1, 'C', True)
+                    
+                    # En-tête tableau joueurs
+                    pdf.set_font('Arial', 'B', 10)
+                    pdf.set_fill_color(220, 220, 220)
+                    pdf.cell(100, 7, "Joueur", 1, 0, 'L', True)
+                    pdf.cell(30, 7, "Handicap", 1, 1, 'C', True)
+                    
+                    # Récupérer et afficher les joueurs
+                    cursor.execute("""
+                        SELECT nom, handicap FROM flights_joueurs 
+                        WHERE id_flight = ?
+                        ORDER BY handicap
+                    """, (flight_id,))
+                    
+                    pdf.set_font('Arial', '', 10)
+                    for nom, handicap in cursor.fetchall():
+                        # Mettre en évidence les rabbits
+                        if handicap > 36:
+                            pdf.set_fill_color(255, 200, 200)
+                            pdf.cell(100, 7, nom, 1, 0, 'L', True)
+                            pdf.cell(30, 7, f"{handicap:.1f}", 1, 1, 'C', True)
+                        else:
+                            pdf.cell(100, 7, nom, 1, 0, 'L')
+                            pdf.cell(30, 7, f"{handicap:.1f}", 1, 1, 'C')
+                    
+                    pdf.ln(5)
+            
+            # Sauvegarder le PDF
+            pdf.output(filename)
+            return True, filename
+        
+        except Exception as e:
+            self.log(f"Erreur lors de l'export PDF des flights: {str(e)}")
+            return False, str(e)
+            
 def main():
     import argparse
     
@@ -1146,6 +1616,7 @@ def main():
     parser.add_argument('--reset', action='store_true', help='Supprimer la base de données existante et recommencer')
     parser.add_argument('--pars', help='Configurer les pars (format: 1=4,2=3,3=5,...)')
     parser.add_argument('--pdf', help='Exporter le classement en PDF (spécifier le nom du fichier)')
+    parser.add_argument('--import-html', help='Importer les joueurs depuis un fichier HTML et répartir entre aller/retour')
     
     args = parser.parse_args()
     
@@ -1192,6 +1663,27 @@ def main():
                 else:
                     print(f"✗ {file} - Erreur: {result}")
     
+    # Import HTML si demandé
+    if args.import_html:
+        if not os.path.exists(args.import_html):
+            print(f"ERREUR: Le fichier HTML {args.import_html} n'existe pas!")
+            sys.exit(1)
+        
+        print(f"Importation des joueurs depuis le fichier HTML: {args.import_html}")
+        joueurs_aller, joueurs_retour, tous_joueurs = manager.importer_joueurs_html(args.import_html)
+        
+        print(f"\nRésultats d'importation:")
+        print(f"Total des joueurs importés: {len(tous_joueurs)}")
+        print(f"Répartition: {len(joueurs_aller)} joueurs à l'aller, {len(joueurs_retour)} joueurs au retour")
+        
+        print("\nJoueurs Aller:")
+        for i, (nom, handicap) in enumerate(joueurs_aller, 1):
+            print(f"{i:2d}. {nom:<30} (Handicap: {handicap})")
+        
+        print("\nJoueurs Retour:")
+        for i, (nom, handicap) in enumerate(joueurs_retour, 1):
+            print(f"{i:2d}. {nom:<30} (Handicap: {handicap})")
+    
     # Export PDF si demandé
     if args.pdf:
         print(f"Exportation du classement en PDF: {args.pdf}")
@@ -1204,8 +1696,9 @@ def main():
     if args.joueur:
         manager.afficher_detail_joueur(args.joueur)
     else:
-        # Affichage du classement formaté
-        manager.afficher_classement_formatte()
+        # Affichage du classement formaté (uniquement si aucune autre action spécifiée)
+        if not (args.dir or args.pdf or args.import_html):
+            manager.afficher_classement_formatte()
     
     manager.close()
 

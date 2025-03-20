@@ -37,6 +37,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-tab-pane" type="button" role="tab">Catégories</button>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/aide">Aide</a>
+                </li>
                 <li class="nav-item ms-auto">
                     <a href="/manche/{{ classement.info.id }}/pdf" class="btn btn-outline-primary">Exporter PDF</a>
                 </li>
@@ -105,6 +108,38 @@
                         </tbody>
                     </table>
                 </div>
+                <!-- Ajout des statistiques d'eagle et birdie -->
+                <div class="mt-4">
+                    <h5>Statistiques</h5>
+                    <p>Nombre total d'Eagles: {{ classement.stats_aller.total_eagles }} | Nombre total de Birdies: {{ classement.stats_aller.total_birdies }}</p>
+                    
+                    {% if classement.stats_aller.joueurs_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Joueur</th>
+                                    <th>Détail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for j in classement.stats_aller.joueurs_stats %}
+                                <tr>
+                                    <td>{{ j.nom }}</td>
+                                    <td>
+                                        {% if j.trous_eagles %}Eagles: trous {{ j.trous_eagles|join(', ') }}{% endif %}
+                                        {% if j.trous_eagles and j.trous_birdies %} | {% endif %}
+                                        {% if j.trous_birdies %}Birdies: trous {{ j.trous_birdies|join(', ') }}{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Aucun eagle ou birdie réalisé</p>
+                    {% endif %}
+                </div>
                 {% else %}
                 <div class="alert alert-info">Aucun joueur n'a joué l'aller lors de cette manche</div>
                 {% endif %}
@@ -170,6 +205,38 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+                <!-- Ajout des statistiques d'eagle et birdie -->
+                <div class="mt-4">
+                    <h5>Statistiques</h5>
+                    <p>Nombre total d'Eagles: {{ classement.stats_retour.total_eagles }} | Nombre total de Birdies: {{ classement.stats_retour.total_birdies }}</p>
+                    
+                    {% if classement.stats_retour.joueurs_stats %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Joueur</th>
+                                    <th>Détail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for j in classement.stats_retour.joueurs_stats %}
+                                <tr>
+                                    <td>{{ j.nom }}</td>
+                                    <td>
+                                        {% if j.trous_eagles %}Eagles: trous {{ j.trous_eagles|join(', ') }}{% endif %}
+                                        {% if j.trous_eagles and j.trous_birdies %} | {% endif %}
+                                        {% if j.trous_birdies %}Birdies: trous {{ j.trous_birdies|join(', ') }}{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Aucun eagle ou birdie réalisé</p>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="alert alert-info">Aucun joueur n'a joué le retour lors de cette manche</div>
