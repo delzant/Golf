@@ -1347,40 +1347,91 @@ class EclectiqueManager:
         """
         self.log(f"Début de l'importation des joueurs depuis {fichier_html}")
         
-        # Lecture du fichier HTML
-        try:
-            with open(fichier_html, 'r', encoding='utf-8') as f:
-                html_content = f.read()
-        except UnicodeDecodeError:
-            self.log(f"Erreur d'encodage UTF-8, essai avec latin-1")
-            with open(fichier_html, 'r', encoding='latin-1') as f:
-                html_content = f.read()
-                
+        # Lecture du fichier HTML avec tests d'encodage multiples
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        html_content = None
+        
+        for encoding in encodings:
+            try:
+                with open(fichier_html, 'r', encoding=encoding) as f:
+                    html_content = f.read()
+                    self.log(f"Fichier lu avec succès en encodage {encoding}")
+                    break
+            except UnicodeDecodeError:
+                self.log(f"Échec avec encodage {encoding}")
+        
+        if html_content is None:
+            self.log("Impossible de lire le fichier avec les encodages testés")
+            return [], [], []
+        
+        self.log(f"Premiers 200 caractères du HTML: {html_content[:200]}")
+        
         from bs4 import BeautifulSoup
         import re
         
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Liste pour stocker les joueurs
-        tous_joueurs = []
+        # Test de tous les liens d'abord
+        all_links = soup.find_all('a')
+        self.log(f"Nombre total de liens: {len(all_links)}")
         
         # Chercher les liens qui contiennent les noms des joueurs
         links = soup.find_all('a', class_='buttonProfile')
+        self.log(f"Nombre de liens avec classe 'buttonProfile': {len(links)}")
         
-        self.log(f"Trouvé {len(links)} joueurs dans le HTML")
+        # Si aucun lien avec cette classe, essayons de trouver une autre approche
+        if not links:
+            self.log("Pas de liens avec classe 'buttonProfile', recherche de liens alternatifs...")
+            # Afficher quelques liens pour voir leur structure
+            for i, link in enumerate(all_links[:5]):
+                self.log(f"Exemple lien {i}: {link}")
+        
+        # Liste pour stocker les joueurs
+        tous_joueurs = []
+        
+        # Nombre de liens analysés et de patterns réussis/échoués
+        links_processed = 0
+        pattern_success = 0
+        pattern_failed = 0
         
         for link in links:
+            links_processed += 1
             texte = link.text.strip()
+            self.log(f"Analyse lien {links_processed}: '{texte}'")
             
-            # Extraction du nom et du handicap avec regex
-            match = re.search(r'([^(]+)\s*\(([0-9,.]+)\)', texte)
+            # Test de plusieurs patterns regex pour trouver les noms et handicaps
+            patterns = [
+                r'([^(]+)\s*\(([0-9,.]+)\)',  # Original: Nom (12.3)
+                r'([^[]+)\s*\[([0-9,.]+)\]',  # Alternative: Nom [12.3]
+                r'(.+?)[\(\[]([0-9,.]+)[\)\]]',  # Plus générique
+            ]
+            
+            match = None
+            for pattern in patterns:
+                match = re.search(pattern, texte)
+                if match:
+                    self.log(f"Pattern réussi: {pattern}")
+                    pattern_success += 1
+                    break
+            
             if match:
                 nom = match.group(1).strip()
-                handicap = float(match.group(2).strip().replace(',', '.'))
-                tous_joueurs.append((nom, handicap))
+                handicap_str = match.group(2).strip().replace(',', '.')
+                try:
+                    handicap = float(handicap_str)
+                    tous_joueurs.append((nom, handicap))
+                    self.log(f"Joueur extrait: {nom} (handicap: {handicap})")
+                except ValueError:
+                    self.log(f"Erreur conversion handicap '{handicap_str}'")
+                    pattern_failed += 1
+            else:
+                self.log(f"Aucun pattern ne correspond pour: '{texte}'")
+                pattern_failed += 1
         
+        self.log(f"Extraction terminée: {pattern_success} réussis, {pattern_failed} échoués")
         self.log(f"Extraction de {len(tous_joueurs)} joueurs du HTML")
         
+        # Le reste de la fonction reste identique...
         # Initialisation des listes pour aller et retour
         joueurs_aller = []
         joueurs_retour = []
@@ -1394,7 +1445,7 @@ class EclectiqueManager:
             # Rechercher le joueur dans la base de données
             cursor.execute("""
                 SELECT id_national, nom FROM joueurs 
-                WHERE nom LIKE ? OR ? LIKE CONCAT('%', nom, '%')
+                WHERE nom LIKE ? OR ? LIKE '%' || nom || '%'
             """, (f"%{nom}%", nom))
             
             joueur_rows = cursor.fetchall()
