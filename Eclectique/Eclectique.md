@@ -1,54 +1,53 @@
-# Documentation du programme EclectiqueManager
+# Documentation Technique EclectiqueManager
 
-## Présentation générale
+## 1. Présentation générale
 
 `EclectiqueManager` est un programme Python qui permet de gérer une compétition de golf de type "Eclectique". Cette compétition se déroule en plusieurs manches sur un même parcours, et consiste à retenir le meilleur score réalisé par chaque joueur sur chaque trou au fil des manches.
 
-Le programme gère:
-- L'importation des résultats depuis des fichiers Excel
-- L'importation des joueurs depuis des fichiers HTML
-- Le stockage des données dans une base SQLite
-- Le calcul du classement Eclectique
-- La gestion des flights (groupes de départ)
-- L'affichage formaté des résultats
-- L'export des classements et flights aux formats PDF et HTML
-- Une interface web interactive via Flask
+### Fonctionnalités principales
+- Importation des résultats depuis des fichiers Excel
+- Importation des joueurs depuis des fichiers HTML
+- Stockage des données dans une base SQLite
+- Calcul du classement Eclectique
+- Gestion des flights (groupes de départ)
+- Affichage formaté des résultats
+- Export des classements et flights aux formats PDF et HTML
+- Interface web interactive via Flask
 
-## Base de données
+## 2. Architecture technique
 
-Le programme utilise SQLite et crée plusieurs tables:
+### 2.1 Structure de la base de données
 
-### Tables principales
-
-1. **joueurs**: Stocke les informations des golfeurs
-   - `id_national`: Identifiant fédéral du joueur (clé primaire)
+#### Tables principales
+1. **joueurs**: Informations des golfeurs
+   - `id_national`: Identifiant fédéral (clé primaire)
    - `nom`: Nom complet du joueur
    - `genre`: Genre du joueur
-   - `homeclub`: Club d'appartenance du joueur
+   - `homeclub`: Club d'appartenance
    - `age`: Âge du joueur
    - `handicap`: Handicap du joueur
 
-2. **manches**: Enregistre les informations de chaque compétition
-   - `id`: Identifiant unique de la manche (clé primaire, auto-incrémenté)
+2. **manches**: Informations des compétitions
+   - `id`: Identifiant unique (clé primaire, auto-incrémenté)
    - `date`: Date de la manche
    - `nom_competition`: Nom de la compétition
    - `tee_depart`: Départ utilisé
    - `couleur_depart`: Couleur des départs
    - `nom_fichier`: Nom du fichier Excel source
 
-3. **scores**: Contient les scores réalisés par les joueurs
+3. **scores**: Scores des joueurs
    - `id_joueur`: Identifiant du joueur
    - `id_manche`: Identifiant de la manche
    - `trou`: Numéro du trou (1-18)
    - `score`: Nombre de coups réalisés
    - Clé primaire composée: (id_joueur, id_manche, trou)
 
-4. **trous**: Définit les caractéristiques du parcours
+4. **trous**: Caractéristiques du parcours
    - `trou`: Numéro du trou (clé primaire)
    - `par`: Nombre de coups standard pour le trou
-   - `handicap_index`: Index de difficulté du trou (non utilisé actuellement)
+   - `handicap_index`: Index de difficulté du trou
 
-5. **corrections**: Stocke les corrections manuelles de scores
+5. **corrections**: Corrections manuelles de scores
    - `id_joueur`: Identifiant du joueur
    - `trou`: Numéro du trou
    - `score`: Score corrigé
@@ -56,355 +55,122 @@ Le programme utilise SQLite et crée plusieurs tables:
    - `date_correction`: Date de la correction
    - Clé primaire composée: (id_joueur, trou)
 
-### Tables pour les flights
-
-6. **flights_departs**: Informations générales sur un groupe de départs
+#### Tables pour les flights
+6. **flights_departs**: Groupes de départs
    - `id`: Identifiant unique (clé primaire, auto-incrémenté)
    - `date`: Date des départs
-   - `strategy`: Stratégie utilisée pour la répartition (simple, kmeans, mixed)
-   - `random_factor`: Facteur d'aléatoire (pourcentage)
+   - `strategy`: Stratégie de répartition
+   - `random_factor`: Facteur d'aléatoire (%)
 
-7. **flights**: Définit les groupes de départs
+7. **flights**: Groupes de départs
    - `id`: Identifiant unique (clé primaire, auto-incrémenté)
    - `id_depart`: Référence vers flights_departs
    - `nom`: Nom du flight (ex: A1, R2)
-   - `type`: Type de parcours (aller ou retour)
+   - `type`: Type de parcours (aller/retour)
 
-8. **flights_joueurs**: Joueurs assignés à chaque flight
+8. **flights_joueurs**: Joueurs par flight
    - `id`: Identifiant unique (clé primaire, auto-incrémenté)
    - `id_flight`: Référence vers flights
    - `nom`: Nom du joueur
    - `handicap`: Handicap du joueur
 
-## Fonctionnalités principales
+### 2.2 Dépendances logicielles
 
-### Importation des données
+- Python 3.6 ou supérieur
+- Bibliothèques:
+  - pandas (lecture des fichiers Excel)
+  - sqlite3 (gestion de la BDD)
+  - fpdf2 (export PDF)
+  - Flask (interface web)
+  - Jinja2 (templating)
+  - beautifulsoup4 (parsing HTML)
+  - numpy (calculs)
 
-#### Importation de scores
+## 3. Utilisation locale
 
-Les scores sont importés depuis des fichiers Excel avec une structure spécifique:
-- La première ligne contient les headers des colonnes: Tee de départ, Genre, Couleur, Date, Nom de la compétition, ID fédéral, Nom, Club, Handicap, Age
-- Puis les scores pour chaque trou joué (colonnes 10 à 27)
-
-Le programme:
-- Analyse les fichiers Excel de manière robuste
-- Détecte automatiquement les colonnes et leur signification
-- Évite les doublons en vérifiant si un joueur a déjà des scores pour une date spécifique
-- Gère les erreurs et les fichiers corrompus
-
-#### Importation de joueurs
-
-Le programme peut importer des joueurs depuis un fichier HTML de départ et les répartir automatiquement entre l'aller (trous 1-9) et le retour (trous 10-18). La répartition se fait selon:
-
-- L'historique des manches du joueur (aller pour ceux qui ont joué le retour précédemment et vice-versa)
-- Un équilibrage des groupes si aucun historique n'est disponible
-
-### Gestion des flights
-
-Le programme inclut un système complet de gestion des flights (groupes de départ) avec:
-
-- Importation des joueurs depuis un fichier HTML
-- Répartition des joueurs entre aller et retour
-- Ajustement manuel des listes
-- Génération automatique des flights selon trois stratégies:
-  - Simple: Par ordre de handicap avec facteur aléatoire
-  - K-means: Groupes par niveau avec facteur aléatoire
-  - Mixte: Équilibrage des niveaux dans chaque flight
-- Règles de validation (max 4 joueurs par flight, max 1 "rabbit" par flight, etc.)
-- Export des flights en PDF pour affichage au club
-
-### Calcul du classement
-
-Le classement Eclectique consiste à:
-- Pour chaque joueur, retenir son meilleur score sur chaque trou parmi toutes les manches jouées
-- Additionner ces meilleurs scores pour obtenir le total Eclectique
-- Trier les joueurs par score total (du plus petit au plus grand)
-- Gérer les ex-aequo (si deux joueurs ont le même score, ils obtiennent le même classement)
-
-Le programme gère également:
-- Les classements par manche (aller, retour, 18 trous)
-- Les classements par catégorie (hommes, femmes, rabbits)
-- Les statistiques d'eagles et de birdies
-
-### Corrections manuelles
-
-Un système de corrections manuelles permet:
-- Corriger les scores d'un joueur sur des trous spécifiques
-- Ajouter une note explicative pour chaque correction
-- Tracer les corrections avec horodatage
-- Prendre en compte ces corrections dans le classement Eclectique
-
-### Affichage des résultats
-
-L'affichage des résultats est formaté sous forme de tableau comprenant:
-- Les informations des joueurs (Nom, Handicap, Nombre de participations)
-- La ligne des pars pour chaque trou
-- Les meilleurs scores par trou pour chaque joueur (avec code couleur)
-- Le total Eclectique
-
-Les codes couleurs utilisés pour les scores sont:
-- **Rouge** : Eagle ou mieux (2 coups ou plus sous le par)
-- **Jaune** : Birdie (1 coup sous le par)
-- **Bleu** : Par
-- **Sans couleur** (noir) : Au-dessus du par
-
-Un affichage détaillé par joueur est également disponible, montrant:
-- Les meilleurs scores par trou et la date à laquelle ils ont été réalisés
-- La liste de toutes les manches auxquelles le joueur a participé
-- Le détail des scores pour chaque manche
-
-### Export PDF
-
-Le programme permet d'exporter au format PDF:
-- Le classement Eclectique complet
-- Le classement d'une manche spécifique
-- Les feuilles de départ (flights)
-
-Caractéristiques:
-- Tableaux formatés avec les mêmes codes couleurs que l'affichage console
-- Les participations supérieures à 5 sont mises en évidence avec un fond vert
-- Format optimisé pour tenir sur une page A4
-- Gestion automatique des sauts de page pour les longs classements
-- Mise en évidence des "rabbits" (handicap > 36)
-
-### Export HTML
-
-Le programme peut également exporter le classement au format HTML interactif, offrant:
-- Un affichage formaté avec les mêmes codes couleurs
-- Des lignes cliquables pour afficher les détails de chaque joueur
-- Compatibilité avec le format d'API JSON
-
-## Interface Web
-
-Le programme inclut une application web Flask qui permet:
-- Affichage du classement Eclectique avec interface interactive
-- Consultation des détails de chaque joueur via une API JSON
-- Import de nouvelles manches via une interface d'administration
-- Gestion des flights avec interface graphique
-- Gestion des corrections de scores
-- Affichage adapté pour mobile et desktop
-
-### Endpoints API principaux
-
-- `/` : Page d'accueil affichant le classement Eclectique
-- `/details-joueur/<id_joueur>` : API JSON retournant les détails d'un joueur
-- `/admin` : Interface d'administration
-- `/import` : API pour importer un fichier Excel
-- `/api/import-html` : API pour importer des joueurs depuis un fichier HTML
-- `/api/save-flights` : API pour sauvegarder les flights générés
-- `/flights` : Interface de gestion des flights
-- `/flights/print/<id_depart>` : Affichage des flights pour impression
-- `/flights/print/<id_depart>/pdf` : Export PDF des flights
-- `/api/correction/<id_joueur>` : API pour gérer les corrections de scores
-- `/manches` : Liste des manches disponibles
-- `/manche/<id_manche>` : Affichage du classement d'une manche
-- `/manche/<id_manche>/pdf` : Export PDF d'une manche
-
-### Structure des templates
-
-- `index.html` : Template pour l'affichage du classement Eclectique
-- `admin.html` : Template pour l'interface d'administration
-- `flights.html` : Template pour la gestion des flights
-- `flights_print.html` : Template pour l'impression des flights
-- `import_html.html` : Template pour l'import de joueurs depuis un fichier HTML
-- `manche.html` : Template pour l'affichage du classement d'une manche
-- `manches.html` : Template pour la liste des manches
-
-### Lancement du serveur web
+### 3.1 Installation et configuration
 
 ```bash
-python app.py
+# Cloner le dépôt
+git clone <URL-du-repo>
+cd Golf
+
+# Installer les dépendances
+pip install -r requirements.txt
 ```
 
-Le serveur démarre par défaut sur le port 7001 (http://localhost:7001/).
+### 3.2 Variables d'environnement
 
-## Variables d'environnement
+- `ECLECTIQUE_DB`: Chemin vers la base de données SQLite (défaut: "eclectique.db")
 
-- `ECLECTIQUE_DB` : Chemin vers la base de données SQLite (défaut: "eclectique.db")
-
-## Utilisation du programme
-
-### Options de ligne de commande
+### 3.3 Options de ligne de commande
 
 ```
 python eclectique_manager.py [options]
 ```
 
 Options disponibles:
-- `--db FICHIER`: Chemin vers la base de données (défaut: eclectique.db)
+- `--db FICHIER`: Chemin vers la base de données
 - `--dir DOSSIER`: Répertoire contenant les fichiers Excel à importer
-- `--joueur ID`: Afficher le détail pour un joueur spécifique (ID national)
-- `--verbose`, `-v`: Mode verbeux (affiche les détails de l'exécution)
+- `--joueur ID`: Afficher le détail pour un joueur spécifique
+- `--verbose`, `-v`: Mode verbeux
 - `--reset`: Supprimer et recréer la base de données
 - `--pars VAL`: Configurer les pars des trous (format: 1=4,2=3,3=5,...)
 - `--pdf FICHIER`: Exporter le classement au format PDF
 - `--import-html FICHIER`: Importer les joueurs depuis un fichier HTML
 
-### Exemples d'utilisation
-
-1. **Configurer les pars du parcours**:
-   ```bash
-   python eclectique_manager.py --pars 1=4,2=3,3=5,4=4,5=3,6=4,7=5,8=4,9=4,10=4,11=4,12=3,13=5,14=4,15=3,16=5,17=5,18=4
-   ```
-
-2. **Importer des fichiers Excel**:
-   ```bash
-   python eclectique_manager.py --dir ./data
-   ```
-
-3. **Afficher le classement Eclectique**:
-   ```bash
-   python eclectique_manager.py
-   ```
-
-4. **Voir les détails d'un joueur**:
-   ```bash
-   python eclectique_manager.py --joueur 123456
-   ```
-
-5. **Réinitialiser la base de données**:
-   ```bash
-   python eclectique_manager.py --reset
-   ```
-
-6. **Exporter le classement en PDF**:
-   ```bash
-   python eclectique_manager.py --pdf classement.pdf
-   ```
-
-7. **Importer des joueurs depuis un fichier HTML**:
-   ```bash
-   python eclectique_manager.py --import-html departs.html
-   ```
-
-8. **Lancer l'interface web**:
-   ```bash
-   python app.py
-   ```
-
-## Structure du code
-
-Le programme est organisé en deux modules principaux:
-
-### eclectique_manager.py
-Contient la classe `EclectiqueManager` avec toutes les méthodes nécessaires:
-
-- `__init__`: Initialise la classe et la connexion à la base de données
-- `init_db`: Crée les tables si elles n'existent pas
-- `set_pars`: Configure les pars pour les trous
-- `import_manche`: Importe une manche depuis un fichier Excel
-- `import_directory`: Importe tous les fichiers Excel d'un répertoire
-- `get_classement_eclectique`: Calcule le classement Eclectique
-- `afficher_classement_formatte`: Affiche le classement sous forme de tableau
-- `afficher_detail_joueur`: Affiche les détails d'un joueur spécifique
-- `export_pdf`: Exporte le classement au format PDF
-- `export_classement_html`: Exporte le classement au format HTML
-- `get_classement_manche`: Calcule le classement d'une manche
-- `get_manches_liste`: Récupère la liste des manches
-- `export_classement_manche_pdf`: Exporte le classement d'une manche en PDF
-- `importer_joueurs_html`: Importe les joueurs depuis un fichier HTML
-- `export_flights_pdf`: Exporte les flights au format PDF
-- `close`: Ferme la connexion à la base de données
-
-Le module intègre également une classe `PDF` qui étend la classe `FPDF` pour personnaliser l'export PDF.
-
-### app.py
-Contient l'application web Flask:
-
-- `index()`: Affiche la page d'accueil avec le classement
-- `details_joueur(id_joueur)`: Fournit les détails d'un joueur en JSON
-- `admin()`: Affiche l'interface d'administration
-- `import_file()`: Gère l'importation de fichiers Excel
-- `import_html()`: Gère l'importation de joueurs depuis un fichier HTML
-- `classement_manche(id_manche)`: Affiche le classement d'une manche
-- `flights_management()`: Affiche l'interface de gestion des flights
-- `save_flights()`: Enregistre les flights générés
-- `print_flights(id_depart)`: Affiche les flights pour impression
-- `export_flights_pdf(id_depart)`: Exporte les flights en PDF
-- `api_correction(id_joueur)`: Gère les corrections de scores
-
-## Format des fichiers Excel
-
-Le programme attend des fichiers Excel avec la structure suivante:
-- Première ligne: En-têtes (Tee, Genre, Couleur, Date, Compétition)
-- Lignes suivantes: Données des joueurs
-  - Colonnes 0-9: Informations des joueurs
-  - Colonnes 10+: Scores pour les trous (1 à 18)
-
-## Dépendances
-
-- Python 3.6 ou supérieur
-- Bibliothèques:
-  - pandas (pour la lecture des fichiers Excel)
-  - sqlite3 (inclus dans Python standard)
-  - fpdf2 (pour l'export PDF)
-  - Flask (pour l'interface web)
-  - Jinja2 (pour le templating)
-  - beautifulsoup4 (pour le parsing HTML)
-  - numpy (pour les calculs)
-
-## Installation des dépendances
+### 3.4 Exemples d'utilisation
 
 ```bash
-pip install -r requirements.txt
+# Configurer les pars du parcours
+python eclectique_manager.py --pars 1=4,2=3,3=5,4=4,5=3,6=4,7=5,8=4,9=4,10=4,11=4,12=3,13=5,14=4,15=3,16=5,17=5,18=4
+
+# Importer des fichiers Excel
+python eclectique_manager.py --dir ./data
+
+# Afficher le classement Eclectique
+python eclectique_manager.py
+
+# Voir les détails d'un joueur
+python eclectique_manager.py --joueur 123456
+
+# Lancer l'interface web
+python app.py
 ```
 
-## Limitations actuelles et pistes d'amélioration
+## 4. Déploiement sur AWS
 
-- Pas d'authentification pour l'interface d'administration
-- Gestion limitée des erreurs dans les fichiers Excel
-- Possibilité d'ajouter d'autres formats d'export
-- Pas de gestion des handicaps pour calculer les scores nets
-- Pas de statistiques avancées par joueur ou par trou
-- Ajout d'un contrôle d'accès sur l'interface admin
-- Création d'une API plus complète pour intégration avec d'autres applications
-- Amélioration de la répartition automatique des joueurs entre aller et retour
-- Gestion de plusieurs parcours différents
+### 4.1 Architecture de déploiement
 
-# Déploiement et gestion sur AWS
-
-Cette section documente le déploiement et la gestion de l'application Eclectique sur AWS.
-
-## Architecture de déploiement
-
-L'application est déployée selon l'architecture suivante:
-- Instance EC2 (Amazon Linux 2023) pour héberger l'application Flask
+- Instance EC2 (Amazon Linux 2023)
 - Nginx comme serveur proxy inverse
-- Gunicorn comme serveur WSGI pour exécuter l'application Flask
-- DNS configuré pour diriger un sous-domaine vers l'instance EC2
+- Gunicorn comme serveur WSGI
+- DNS configuré pour un sous-domaine
 
-## Configuration de l'EC2
-
-### Installation des dépendances
+### 4.2 Installation sur EC2
 
 ```bash
+# Mise à jour du système
 sudo dnf update -y
 sudo dnf install -y python3 python3-pip git nginx
-```
 
-### Configuration de l'application
-
-1. Cloner le dépôt:
-```bash
+# Cloner le dépôt
 git clone <URL-du-repo> /home/ec2-user/Golf
 cd /home/ec2-user/Golf
-```
 
-2. Installer les dépendances Python:
-```bash
+# Installer les dépendances
 pip install -r requirements.txt
 pip install gunicorn
-pip install beautifulsoup4
 ```
 
-### Configuration de Gunicorn comme service
+### 4.3 Configuration de Gunicorn comme service
 
-Créer un fichier de service systemd:
 ```bash
+# Créer le fichier de service
 sudo nano /etc/systemd/system/eclectique.service
 ```
 
-Contenu du fichier:
+Contenu du fichier service:
 ```ini
 [Unit]
 Description=Gunicorn service for Eclectique
@@ -427,14 +193,13 @@ sudo systemctl enable eclectique
 sudo systemctl start eclectique
 ```
 
-### Configuration de Nginx
+### 4.4 Configuration de Nginx
 
-Créer une configuration Nginx pour l'application:
 ```bash
 sudo nano /etc/nginx/conf.d/eclectique.conf
 ```
 
-Contenu du fichier pour servir l'application sur un sous-domaine:
+Contenu:
 ```nginx
 server {
     listen 80;
@@ -457,104 +222,183 @@ sudo systemctl enable nginx
 sudo systemctl restart nginx
 ```
 
-## Configuration DNS
+### 4.5 Configuration HTTPS (optionnel)
 
-Configurer Route 53 ou le fournisseur DNS pour créer un enregistrement A pointant vers l'adresse IP publique de l'instance EC2:
-- Nom: eclectique.it-xpert.be
-- Type: A
-- Valeur: [Adresse IP publique de l'EC2]
-
-## Opérations de maintenance
-
-### Mise à jour du code
-
-Pour mettre à jour l'application avec les dernières modifications:
-```bash
-cd /home/ec2-user/Golf
-git pull
-sudo systemctl restart eclectique
-```
-
-### Surveillance des logs
-
-Logs de l'application (Gunicorn):
-```bash
-sudo journalctl -u eclectique -f
-```
-
-Logs de Nginx:
-```bash
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
-```
-
-### Gestion de la base de données
-
-Pour transférer une base de données SQLite depuis une machine locale vers EC2:
-```bash
-scp -i /chemin/vers/cle.pem /chemin/local/vers/eclectique.db ec2-user@ip-ec2:/home/ec2-user/Golf/Eclectique/
-```
-
-Pour sauvegarder la base de données depuis EC2:
-```bash
-scp -i /chemin/vers/cle.pem ec2-user@ip-ec2:/home/ec2-user/Golf/Eclectique/eclectique.db /chemin/local/sauvegarde/
-```
-
-## Sécurité
-
-Assurez-vous que le groupe de sécurité de l'instance EC2 autorise uniquement:
-- SSH (port 22) depuis des adresses IP spécifiques
-- HTTP (port 80) depuis partout
-- HTTPS (port 443) depuis partout
-
-Pour une configuration de production complète, il est recommandé d'ajouter HTTPS avec Let's Encrypt:
 ```bash
 sudo dnf install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d eclectique.it-xpert.be
 ```
 
-## Backup et restauration
+## 5. Maintenance et exploitation
 
-### Backup automatique
+### 5.1 Scripts de maintenance
 
-Créez un script de sauvegarde pour la base de données:
+Des scripts utilitaires sont disponibles dans le répertoire `bin/`:
+
 ```bash
-#!/bin/bash
-DATE=$(date +%Y%m%d)
-BACKUP_DIR=/home/ec2-user/backups
-mkdir -p $BACKUP_DIR
-cp /home/ec2-user/Golf/Eclectique/eclectique.db $BACKUP_DIR/eclectique_$DATE.db
-# Optionnel: transfert vers S3
-# aws s3 cp $BACKUP_DIR/eclectique_$DATE.db s3://mon-bucket-de-sauvegarde/
+# Gestion du service
+./bin/service.sh {start|stop|restart|status}
+
+# Visualisation des logs
+./bin/logs.sh {app|nginx|search <terme>|tail <nombre_lignes>}
+
+# Sauvegarde de la base de données
+./bin/backup.sh
+
+# Mise à jour de l'application
+./bin/update.sh
+
+# Vérification de l'état du système
+./bin/healthcheck.sh
 ```
 
-Configurez une tâche cron pour exécuter ce script quotidiennement:
+Rendre les scripts exécutables:
 ```bash
-0 2 * * * /home/ec2-user/backup_script.sh
+chmod +x /home/ec2-user/Golf/Eclectique/bin/*.sh
 ```
 
-## Résolution des problèmes courants
+### 5.2 Surveillance des logs
 
-### L'application ne démarre pas
+Pour visualiser les logs de l'application:
+
+```bash
+# Afficher les logs en temps réel
+sudo journalctl -u eclectique -f
+
+# Afficher les dernières entrées (50 lignes)
+sudo journalctl -u eclectique -n 50
+
+# Rechercher des messages spécifiques
+sudo journalctl -u eclectique | grep "mot-clé"
+
+# Utiliser le script de logs
+./bin/logs.sh app
+```
+
+Les logs contiennent toutes les informations générées par la méthode `self.log()` utilisée dans le code, ainsi que les erreurs et messages produits par Gunicorn.
+
+Logs Nginx:
+```bash
+sudo tail -f /var/log/nginx/error.log
+sudo tail -f /var/log/nginx/access.log
+```
+
+### 5.3 Backups et restauration
+
+#### Backup manuel
+```bash
+# Sauvegarder la BDD
+cp /home/ec2-user/Golf/Eclectique/eclectique.db /home/ec2-user/backups/eclectique_$(date +%Y%m%d).db
+
+# Utiliser le script de backup
+./bin/backup.sh
+```
+
+#### Backup automatique
+Configurer une tâche cron:
+```bash
+crontab -e
+# Ajouter la ligne:
+0 2 * * * /home/ec2-user/Golf/Eclectique/bin/backup.sh
+```
+
+#### Restauration
+```bash
+cp /home/ec2-user/backups/eclectique_20240320.db /home/ec2-user/Golf/Eclectique/eclectique.db
+sudo systemctl restart eclectique
+```
+
+### 5.4 Mise à jour de l'application
+
+```bash
+cd /home/ec2-user/Golf
+git pull
+pip install -r requirements.txt
+sudo systemctl restart eclectique
+
+# Ou utiliser le script:
+./bin/update.sh
+```
+
+### 5.5 Résolution des problèmes courants
+
+#### L'application ne démarre pas
 ```bash
 sudo systemctl status eclectique
 sudo journalctl -u eclectique -n 50
+./bin/logs.sh tail 100
 ```
 
-### Nginx affiche une erreur 502 Bad Gateway
-Vérifiez que Gunicorn fonctionne:
+#### Erreur 502 Bad Gateway
 ```bash
+# Vérifier que Gunicorn fonctionne
 ps aux | grep gunicorn
 curl http://127.0.0.1:5000
+
+# Vérifier les logs Nginx
+sudo tail -f /var/log/nginx/error.log
 ```
 
-Installez les dépendances manquantes:
-```bash
-pip install -r requirements.txt
-```
-
-### Problèmes de permission de fichiers
-Assurez-vous que les fichiers sont accessibles par l'utilisateur ec2-user:
+#### Problèmes de permission
 ```bash
 sudo chown -R ec2-user:ec2-user /home/ec2-user/Golf
 ```
+
+#### Erreurs de fonction SQL dans SQLite
+Si vous rencontrez des erreurs comme "no such function: CONCAT":
+- Vérifiez que les requêtes SQL utilisent la syntaxe SQLite correcte
+- Remplacez les fonctions MySQL/PostgreSQL par des équivalents SQLite
+- Exemple: remplacer `CONCAT(a, b)` par `a || b`
+
+## 6. Structure du code
+
+### 6.1 eclectique_manager.py
+Classe principale avec toutes les méthodes nécessaires:
+- `__init__`: Initialisation et connexion BDD
+- `init_db`: Création des tables
+- `import_manche`: Import d'une manche Excel
+- `get_classement_eclectique`: Calcul du classement
+- `importer_joueurs_html`: Import des joueurs HTML
+- Etc.
+
+### 6.2 app.py
+Application web Flask:
+- `index()`: Page d'accueil avec classement
+- `details_joueur(id_joueur)`: API JSON détails
+- `admin()`: Interface d'administration
+- `flights_management()`: Interface flights
+- Etc.
+
+### 6.3 Templates HTML
+- `index.html`: Classement Eclectique
+- `admin.html`: Administration
+- `flights.html`: Gestion flights
+- `manche.html`: Classement par manche
+- Etc.
+
+## 7. Interface Web
+
+### 7.1 Endpoints principaux
+- `/`: Classement Eclectique
+- `/details-joueur/<id_joueur>`: API JSON détails
+- `/admin`: Administration
+- `/flights`: Gestion des flights
+- `/manches`: Liste des manches
+- `/manche/<id_manche>`: Classement d'une manche
+
+### 7.2 Endpoints API
+- `/api/joueurs`: Liste des joueurs
+- `/api/correction/<id_joueur>`: Gestion corrections
+- `/api/import-html`: Import joueurs HTML
+- `/api/save-flights`: Sauvegarde des flights
+
+## 8. Limitations et améliorations possibles
+
+- Pas d'authentification pour l'interface admin
+- Gestion limitée des erreurs dans les fichiers Excel
+- Possibilité d'ajouter d'autres formats d'export
+- Pas de gestion des handicaps pour scores nets
+- Pas de statistiques avancées par joueur/trou
+- Ajout d'un contrôle d'accès admin
+- API plus complète pour intégration externe
+- Gestion de plusieurs parcours différents
