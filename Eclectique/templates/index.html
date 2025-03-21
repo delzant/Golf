@@ -197,7 +197,12 @@
                             html += '<ul class="list-group">';
                             html += `<li class="list-group-item">Score eclectique: <strong>${data.stats.score_eclectique}</strong></li>`;
                             html += `<li class="list-group-item">Manches jouées: <strong>${data.stats.nb_manches}</strong></li>`;
-                            html += `<li class="list-group-item">Meilleur score: <strong>${data.stats.meilleur_score_total}</strong></li>`;
+                            html += `<li class="list-group-item">Nombre d'eagles: <strong>${data.stats.nb_eagles}</strong></li>`;
+                            html += `<li class="list-group-item">Nombre de birdies: <strong>${data.stats.nb_birdies}</strong></li>`;
+                            html += `<li class="list-group-item">Meilleur score aller: <strong>${data.stats.meilleur_score_aller}</strong></li>`;
+                            html += `<li class="list-group-item">Meilleur score retour: <strong>${data.stats.meilleur_score_retour}</strong></li>`;
+                            html += `<li class="list-group-item">Score moyen aller: <strong>${data.stats.score_moyen_aller}</strong></li>`;
+                            html += `<li class="list-group-item">Score moyen retour: <strong>${data.stats.score_moyen_retour}</strong></li>`;
                             html += `<li class="list-group-item">Trous complétés: <strong>${data.stats.nb_trous_complets}/18</strong></li>`;
                             html += '</ul>';
                             html += '</div>';
@@ -212,7 +217,8 @@
                             data.meilleurs_scores.forEach(score => {
                                 html += `<tr>
                                     <td>${score.trou}</td>
-                                    <td>${score.score}</td>
+                                    <td>${score.score} ${score.est_correction ? '<span class="badge bg-warning text-dark">Corrigé</span>' : ''}</td>
+
                                     <td>${score.date}</td>
                                 </tr>`;
                             });

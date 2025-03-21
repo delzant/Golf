@@ -69,7 +69,7 @@ def details_joueur(id_joueur):
     nom, handicap = joueur_info
     
     # Meilleurs scores par trou
-    meilleurs_scores = []
+    meilleurs_scores_par_trou = []
     for trou in range(1, 19):
         # Vérifier d'abord s'il existe une correction
         cursor.execute('''
@@ -83,7 +83,7 @@ def details_joueur(id_joueur):
         if correction:
             # Si une correction existe, l'utiliser
             score, note, date_correction = correction
-            meilleurs_scores.append({
+            meilleurs_scores_par_trou.append({
                 "trou": trou,
                 "score": score,
                 "date": date_correction,
@@ -104,7 +104,7 @@ def details_joueur(id_joueur):
             result = cursor.fetchone()
             if result:
                 score, date, nom_compet = result
-                meilleurs_scores.append({
+                meilleurs_scores_par_trou.append({
                     "trou": trou,
                     "score": score,
                     "date": date,
@@ -144,13 +144,112 @@ def details_joueur(id_joueur):
             "score_total": score_total,
             "scores": scores
         })
+        
+    # Nombre total d'eagles et birdies
+    cursor.execute('''
+    SELECT 
+        COUNT(CASE WHEN s.score <= (t.par - 2) THEN 1 END) as eagles,
+        COUNT(CASE WHEN s.score = (t.par - 1) THEN 1 END) as birdies
+    FROM scores s
+    JOIN trous t ON s.trou = t.trou
+    WHERE s.id_joueur = ?
+    ''', (id_joueur,))
+    
+    eagles_birdies = cursor.fetchone()
+    nb_eagles, nb_birdies = eagles_birdies if eagles_birdies else (0, 0)
+    
+    # Meilleurs scores aller et retour (sur une partie)
+    cursor.execute('''
+    SELECT 
+        MIN(aller.total) as meilleur_aller, 
+        MIN(retour.total) as meilleur_retour
+    FROM 
+        (SELECT id_manche, SUM(score) as total 
+         FROM scores 
+         WHERE id_joueur = ? AND trou BETWEEN 1 AND 9 
+         GROUP BY id_manche 
+         HAVING COUNT(trou) = 9) as aller,
+        (SELECT id_manche, SUM(score) as total 
+         FROM scores 
+         WHERE id_joueur = ? AND trou BETWEEN 10 AND 18 
+         GROUP BY id_manche 
+         HAVING COUNT(trou) = 9) as retour
+    ''', (id_joueur, id_joueur))
+    
+    scores_parcours = cursor.fetchone()
+    meilleur_aller, meilleur_retour = scores_parcours if scores_parcours else (None, None)
+    
+    # Approche pour le score moyen aller en excluant les scores ≥ 10
+    cursor.execute('''
+    SELECT id_manche 
+    FROM scores 
+    WHERE id_joueur = ? AND trou BETWEEN 1 AND 9
+    GROUP BY id_manche
+    HAVING COUNT(trou) = 9 AND MAX(score) < 11
+    ''', (id_joueur,))
+    manches_aller_valides = [m[0] for m in cursor.fetchall()]
+
+    total_aller = 0
+    if manches_aller_valides:
+        placeholders = ','.join('?' for _ in manches_aller_valides)
+        query = f'''
+        SELECT id_manche, SUM(score) 
+        FROM scores 
+        WHERE id_joueur = ? AND trou BETWEEN 1 AND 9 AND id_manche IN ({placeholders})
+        GROUP BY id_manche
+        '''
+        params = [id_joueur] + manches_aller_valides
+        cursor.execute(query, params)
+        scores_aller = cursor.fetchall()
+        
+        for _, score in scores_aller:
+            total_aller += score
+            
+        score_moyen_aller = round(total_aller / len(scores_aller), 1) if scores_aller else 0
+    else:
+        score_moyen_aller = 0
+
+    # Même approche pour le retour
+    cursor.execute('''
+    SELECT id_manche 
+    FROM scores 
+    WHERE id_joueur = ? AND trou BETWEEN 10 AND 18
+    GROUP BY id_manche
+    HAVING COUNT(trou) = 9 AND MAX(score) < 11
+    ''', (id_joueur,))
+    manches_retour_valides = [m[0] for m in cursor.fetchall()]
+
+    total_retour = 0
+    if manches_retour_valides:
+        placeholders = ','.join('?' for _ in manches_retour_valides)
+        query = f'''
+        SELECT id_manche, SUM(score) 
+        FROM scores 
+        WHERE id_joueur = ? AND trou BETWEEN 10 AND 18 AND id_manche IN ({placeholders})
+        GROUP BY id_manche
+        '''
+        params = [id_joueur] + manches_retour_valides
+        cursor.execute(query, params)
+        scores_retour = cursor.fetchall()
+        
+        for _, score in scores_retour:
+            total_retour += score
+            
+        score_moyen_retour = round(total_retour / len(scores_retour), 1) if scores_retour else 0
+    else:
+        score_moyen_retour = 0
     
     # Statistiques générales
     stats = {
         "nb_manches": len(manches),
-        "meilleur_score_total": min([m["score_total"] for m in manches]) if manches else 0,
-        "nb_trous_complets": len(meilleurs_scores),
-        "score_eclectique": sum([s["score"] for s in meilleurs_scores])
+        "nb_trous_complets": len(meilleurs_scores_par_trou),
+        "score_eclectique": sum([s["score"] for s in meilleurs_scores_par_trou]),
+        "nb_eagles": nb_eagles or 0,
+        "nb_birdies": nb_birdies or 0,
+        "meilleur_score_aller": meilleur_aller or 0,
+        "meilleur_score_retour": meilleur_retour or 0,
+        "score_moyen_aller": score_moyen_aller,
+        "score_moyen_retour": score_moyen_retour
     }
     
     manager.close()
@@ -161,7 +260,7 @@ def details_joueur(id_joueur):
             "nom": nom,
             "handicap": handicap
         },
-        "meilleurs_scores": meilleurs_scores,
+        "meilleurs_scores": meilleurs_scores_par_trou,
         "manches": manches,
         "stats": stats
     })
