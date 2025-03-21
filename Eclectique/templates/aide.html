@@ -45,9 +45,11 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/manches">Manches</a>
                 </li>
+                {% if session.get('is_admin') %}
                 <li class="nav-item">
                     <a class="nav-link" href="/admin">Administration</a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link active" href="/aide">Aide</a>
                 </li>
