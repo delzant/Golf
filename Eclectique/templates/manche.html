@@ -19,11 +19,11 @@
         
         <nav class="mb-4">
             <ul class="nav nav-tabs" id="myTab" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" href="/">Classement Eclectique</a>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Classement Eclectique</a>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" href="/manches">Manches</a>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path == '/manches' %}active{% endif %}" href="/manches">Manches</a>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="aller-tab" data-bs-toggle="tab" data-bs-target="#aller-tab-pane" type="button" role="tab">Aller</button>
@@ -42,6 +42,11 @@
                 </li>
                 <li class="nav-item ms-auto">
                     <a href="/manche/{{ classement.info.id }}/pdf" class="btn btn-outline-primary">Exporter PDF</a>
+                    {% if session.get('is_admin') %}
+                    <a href="/logout" class="btn btn-outline-danger btn-sm">Quitter le mode admin</a>
+                    {% else %}
+                    <a href="/login" class="btn btn-outline-secondary btn-sm">Administration</a>
+                    {% endif %}
                 </li>
             </ul>
         </nav>

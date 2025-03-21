@@ -1,10 +1,15 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session
 import os
+from functools import wraps
 from eclectique_manager import EclectiqueManager
 from datetime import datetime
+
 app = Flask(__name__)
+app.secret_key = 'qazwsx1234567890'  # Important pour les sessions
+
 db_path = os.environ.get('ECLECTIQUE_DB', 'eclectique.db')
 
+# Route d'accueil
 @app.route('/')
 def index():
     """Page d'accueil avec le classement"""
@@ -47,11 +52,40 @@ def index():
     manager.close()
     return render_template('index.html', joueurs=joueurs_avec_scores, pars=pars, total_par=total_par)
 
+# Décorateur pour protéger les routes admin
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('is_admin', False) is False:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Route de login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == 'golfAI42':  # À remplacer par un vrai mot de passe sécurisé
+            session['is_admin'] = True
+            return redirect(request.args.get('next') or url_for('index'))
+        error = 'Mot de passe incorrect'
+    return render_template('login.html', error=error)
+
+# Route de déconnexion  
+@app.route('/logout')
+def logout():
+    session.pop('is_admin', None)
+    return redirect(url_for('index'))
+
+# Route d'aide
 @app.route('/aide')
 def aide():
     """Page d'aide pour les utilisateurs"""
     return render_template('aide.html')
 
+# Route pour les détails d'un joueur
 @app.route('/details-joueur/<id_joueur>')
 def details_joueur(id_joueur):
     """API pour obtenir les détails d'un joueur en JSON"""
@@ -265,6 +299,7 @@ def details_joueur(id_joueur):
         "stats": stats
     })
 
+# Route pour la liste des manches
 @app.route('/manches')
 def liste_manches():
     """Page listant toutes les manches avec liens vers les classements"""
@@ -273,6 +308,7 @@ def liste_manches():
     manager.close()
     return render_template('manches.html', manches=manches)
 
+# Route pour le classement d'une manche spécifique
 @app.route('/manche/<int:id_manche>')
 def classement_manche(id_manche):
     """Page affichant le classement d'une manche spécifique"""
@@ -292,6 +328,7 @@ def classement_manche(id_manche):
     
     return render_template('manche.html', classement=classement, pars=pars)
 
+# Route pour l'API JSON du classement d'une manche
 @app.route('/api/manche/<int:id_manche>')
 def api_manche(id_manche):
     """API JSON pour le classement d'une manche"""
@@ -304,6 +341,7 @@ def api_manche(id_manche):
     
     return jsonify(classement)
 
+# Route pour l'export PDF du classement d'une manche
 @app.route('/manche/<int:id_manche>/pdf')
 def export_manche_pdf(id_manche):
     """Génère et télécharge le PDF du classement d'une manche"""
@@ -325,6 +363,7 @@ def export_manche_pdf(id_manche):
     from flask import send_file
     return send_file(filename, as_attachment=True, download_name=os.path.basename(filename))
 
+# Route pour l'export PDF de la dernière manche
 @app.route('/manche/latest/pdf')
 def export_latest_manche_pdf():
     """Génère et télécharge le PDF de la dernière manche"""
@@ -344,6 +383,7 @@ def export_latest_manche_pdf():
     # Rediriger vers l'export PDF de cette manche
     return export_manche_pdf(latest_id)
 
+# Route pour la liste des joueurs
 @app.route('/api/joueurs')
 def api_joueurs_liste():
     """API pour obtenir la liste des joueurs en JSON"""
@@ -354,6 +394,7 @@ def api_joueurs_liste():
     manager.close()
     return jsonify(joueurs)
 
+# Route pour la correction des scores
 @app.route('/api/correction/<id_joueur>', methods=['GET', 'POST'])
 def api_correction(id_joueur):
     """API pour récupérer/enregistrer les corrections d'un joueur"""
@@ -446,6 +487,8 @@ def api_correction(id_joueur):
         },
         "scores": meilleurs_scores
     })
+
+# Route pour l'export PDF du classement éclectique
 @app.route('/classement-eclectique/pdf')
 def export_classement_pdf():
     """Génère et télécharge le PDF du classement éclectique avec date de dernière manche"""
@@ -474,12 +517,21 @@ def export_classement_pdf():
     download_name = f"classement_eclectique_{date_str}.pdf"
     return send_file(filename, as_attachment=True, download_name=download_name)
     
+# Routes admin protégées
 @app.route('/admin')
+@admin_required
 def admin():
-    """Interface d'administration"""
     return render_template('admin.html')
 
+# Route pour la gestion des flights
+@app.route('/flights')
+@admin_required
+def flights_management():
+    return render_template('flights.html')
+
+# Route pour l'import d'un fichier Excel
 @app.route('/import', methods=['POST'])
+@admin_required
 def import_file():
     """API pour importer un fichier Excel"""
     if 'file' not in request.files:
@@ -505,8 +557,9 @@ def import_file():
     else:
         return jsonify({"success": False, "error": result})
     
-
+# Route pour l'import d'un fichier HTML
 @app.route('/import-html', methods=['GET', 'POST'])
+@admin_required
 def import_html():
     """Interface pour importer les joueurs à partir d'un fichier HTML"""
     if request.method == 'POST':
@@ -541,7 +594,9 @@ def import_html():
     
     return render_template('import_html.html')    
 
+# API routes admin
 @app.route('/api/import-html', methods=['POST'])
+@admin_required
 def api_import_html():
     """API pour importer les joueurs à partir d'un fichier HTML"""
     if 'file' not in request.files:
@@ -573,13 +628,6 @@ def api_import_html():
         }
     })
     
-# Routes à ajouter à app.py
-
-@app.route('/flights')
-def flights_management():
-    """Interface de gestion des flights"""
-    return render_template('flights.html')
-
 @app.route('/api/save-flights', methods=['POST'])
 def save_flights():
     """API pour sauvegarder les flights générés"""

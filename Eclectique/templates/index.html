@@ -67,16 +67,28 @@
         <nav class="mb-4">
             <ul class="nav nav-tabs">
                 <li class="nav-item">
-                    <a class="nav-link active" href="/">Classement Eclectique</a>
+                    <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Classement Eclectique</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/manches">Manches</a>
+                    <a class="nav-link {% if request.path == '/manches' %}active{% endif %}" href="/manches">Manches</a>
+                </li>
+                {% if session.get('is_admin') %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.path == '/admin' %}active{% endif %}" href="/admin">Administration</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/admin">Administration</a>
+                    <a class="nav-link {% if request.path == '/flights' %}active{% endif %}" href="/flights">Gestion des Flights</a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
-                    <a class="nav-link" href="/aide">Aide</a>
+                    <a class="nav-link {% if request.path == '/aide' %}active{% endif %}" href="/aide">Aide</a>
+                </li>
+                <li class="nav-item ms-auto">
+                    {% if session.get('is_admin') %}
+                    <a href="/logout" class="btn btn-outline-danger btn-sm">Quitter le mode admin</a>
+                    {% else %}
+                    <a href="/login" class="btn btn-outline-secondary btn-sm">Administration</a>
+                    {% endif %}
                 </li>
             </ul>
         </nav>
