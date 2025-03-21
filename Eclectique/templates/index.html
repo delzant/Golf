@@ -229,12 +229,23 @@
                             html += '<h5>Manches jouées</h5>';
                             html += '<div class="accordion" id="accordionManches">';
                             data.manches.forEach((manche, index) => {
+                                // Calculer le score réel et le nombre de trous effectivement joués
+                                let trouesJouesEffectifs = 0;
+                                let scoreEffectif = 0;
+                                
+                                for (let trou in manche.scores) {
+                                    // Un score de 11 ou plus semble indiquer un trou non joué
+                                    if (manche.scores[trou] < 11) {
+                                        trouesJouesEffectifs++;
+                                        scoreEffectif += manche.scores[trou];
+                                    }
+                                }
                                 html += `
                                 <div class="accordion-item">
                                     <h2 class="accordion-header">
                                         <button class="accordion-button collapsed" type="button" 
                                                 data-bs-toggle="collapse" data-bs-target="#collapse${index}">
-                                            ${manche.date} - ${manche.nom} (${manche.score_total})
+                                            ${manche.date} - ${manche.nom} - ${scoreEffectif} (${trouesJouesEffectifs} trous)
                                         </button>
                                     </h2>
                                     <div id="collapse${index}" class="accordion-collapse collapse" 
